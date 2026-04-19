@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		66C4B0112F95641600A6B35B /* LocalChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = 66C4B0102F95641600A6B35B /* LocalChatKit */; };
 		66E930AA2F95153A00E9CBD9 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930A92F95153A00E9CBD9 /* MLXLLM */; };
 		66E930AC2F95153A00E9CBD9 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930AB2F95153A00E9CBD9 /* MLXLMCommon */; };
 		66E930AF2F95177900E9CBD9 /* MLXHuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930AE2F95177900E9CBD9 /* MLXHuggingFace */; };
@@ -87,6 +88,7 @@
 				66E930AA2F95153A00E9CBD9 /* MLXLLM in Frameworks */,
 				66E930AF2F95177900E9CBD9 /* MLXHuggingFace in Frameworks */,
 				66E930B22F951E3B00E9CBD9 /* HuggingFace in Frameworks */,
+				66C4B0112F95641600A6B35B /* LocalChatKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,6 +173,7 @@
 				66E930B42F951F2200E9CBD9 /* Hub */,
 				66E930B62F951F2200E9CBD9 /* Tokenizers */,
 				66E930B82F951F2200E9CBD9 /* Transformers */,
+				66C4B0102F95641600A6B35B /* LocalChatKit */,
 			);
 			productName = LocalChatWithMLX;
 			productReference = 66E9309E2F9514E000E9CBD9 /* LocalChatWithMLX */;
@@ -283,6 +286,7 @@
 				66E930A82F95153A00E9CBD9 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 				66E930B02F951E3B00E9CBD9 /* XCRemoteSwiftPackageReference "swift-huggingface" */,
 				66E930B32F951F2200E9CBD9 /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				66C4B00F2F95641600A6B35B /* XCLocalSwiftPackageReference "LocalChatKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 66E9309F2F9514E000E9CBD9 /* Products */;
@@ -692,6 +696,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		66C4B00F2F95641600A6B35B /* XCLocalSwiftPackageReference "LocalChatKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = LocalChatKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		66E930A82F95153A00E9CBD9 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -720,6 +731,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		66C4B0102F95641600A6B35B /* LocalChatKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LocalChatKit;
+		};
 		66E930A92F95153A00E9CBD9 /* MLXLLM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 66E930A82F95153A00E9CBD9 /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;

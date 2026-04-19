@@ -6,75 +6,38 @@
 //
 
 import Foundation
-import MLXLLM
-import MLXLMCommon
-import MLXHuggingFace
-import HuggingFace
-import Tokenizers
+import LocalChatKit
 
-let modelConfiguration = LLMRegistry.gemma4_e2b_it_4bit
+let manager = ModelManager()
 
-struct WorkerResult {
-    let id: Int
-    let prompt: String
-    let response: String
-    let stats: GenerateCompletionInfo?
-}
-
-/// An actor that owns a single ChatSession and performs all interactions off the main actor.
-actor ChatWorker {
-    let id: Int
-    private let session: ChatSession
-
-    init(id: Int, container: ModelContainer) {
-        self.id = id
-        self.session = ChatSession(container)
-    }
-
-    func askWithDetails(_ prompt: String) async throws -> WorkerResult {
-        var buffer = ""
-        var stats: GenerateCompletionInfo? = nil
-        for try await generation in session.streamDetails(to: prompt, images: [], videos: []) {
-            if case .chunk(let text) = generation {
-                buffer += text
-            }
-            if case .info(let info) = generation {
-                stats = info
-            }
-        }
-        return WorkerResult(id: id, prompt: prompt, response: buffer, stats: stats)
+// Download if needed
+if await !manager.isDownloaded(.gemma4_e2b) {
+    print("Downloading model...")
+    for try await progress in manager.download(.gemma4_e2b) {
+        print("\(progress.percent)% — \(String(format: "%.1f", progress.bytesPerSecond / 1024)) KB/s")
     }
 }
 
-// Load the container once, shared by all sessions.
-print("Loading model...")
-let sharedContainer = try await #huggingFaceLoadModelContainer(
-    configuration: modelConfiguration
-)
-print("Model loaded. Starting parallel sessions...\n")
+// Load model
+print("Loading model into memory...")
+let model = try await manager.load(.gemma4_e2b)
+print("Model ready.\n")
 
-let worker1 = ChatWorker(id: 1, container: sharedContainer)
-let worker2 = ChatWorker(id: 2, container: sharedContainer)
-let worker3 = ChatWorker(id: 3, container: sharedContainer)
+// Stateful session
+let session = ChatSession(model: model, systemPrompt: "You are a helpful assistant.")
 
-// Run all three sessions in parallel, collect results.
-let results = try await withThrowingTaskGroup(of: WorkerResult.self) { group in
-    group.addTask { try await worker1.askWithDetails("What are two things to see in San Francisco?") }
-    group.addTask { try await worker2.askWithDetails("Name two famous dishes from Italy.") }
-    group.addTask { try await worker3.askWithDetails("What is the capital of Japan?") }
-    return try await group.reduce(into: [WorkerResult]()) { $0.append($1) }
-}
-
-// Print results sorted by worker id.
-for result in results.sorted(by: { $0.id < $1.id }) {
-    print("=== Worker \(result.id) ===")
-    print("User: \(result.prompt)")
-    print("Assistant: \(result.response)")
-    if let stats = result.stats {
-        let tps = Double(stats.generationTokenCount) / stats.generateTime
-        print(String(format: "Stats: %d tokens, %.1f tok/s", stats.generationTokenCount, tps))
+// Streaming
+print("User: What are two things to see in San Francisco?")
+print("Assistant: ", terminator: "")
+for try await event in session.sendStreaming("What are two things to see in San Francisco?") {
+    if case .token(let text) = event { print(text, terminator: ""); fflush(stdout) }
+    if case .completed(let stats) = event {
+        print("\n\n[\(String(format: "%.1f", stats.tokensPerSecond)) tok/s, TTFT: \(String(format: "%.2f", stats.timeToFirstToken))s]")
     }
-    print()
 }
 
-print("All sessions completed.")
+// Non-streaming
+print("\nUser: Give me a one-line summary.")
+let response = try await session.send("Give me a one-line summary.")
+print("Assistant: \(response.text)")
+print("[\(String(format: "%.1f", response.stats.tokensPerSecond)) tok/s]")
