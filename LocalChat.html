@@ -1,0 +1,2084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LocalChat · macOS</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0c0c0e; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif;
+      color: rgba(255,255,255,0.92);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    #root { width: 100%; height: 100%; }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* Custom scrollbars — macOS-like */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); background-clip: padding-box; border: 2px solid transparent; }
+
+    kbd {
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    button:focus, input:focus, textarea:focus, select:focus { outline: none; }
+
+    code { font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; }
+
+    textarea::placeholder, input::placeholder { color: rgba(255,255,255,0.35); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+    <script type="text/babel" data-presets="react">
+
+// ===== mac-chrome.jsx =====
+// Dark macOS window chrome. Tahoe-style rounding, translucent sidebar.
+
+const MAC_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", "Helvetica Neue", sans-serif';
+const MAC_MONO = '"SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace';
+
+function TrafficLights({ onClose, dim = false }) {
+  const dot = (bg, label) => (
+    <div style={{
+      width: 12, height: 12, borderRadius: '50%',
+      background: dim ? '#4a4a4a' : bg,
+      border: '0.5px solid rgba(0,0,0,0.35)',
+      boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15)',
+    }} aria-label={label} />
+  );
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      {dot('#ff5f57', 'close')}
+      {dot('#febc2e', 'minimize')}
+      {dot('#28c840', 'maximize')}
+    </div>
+  );
+}
+
+function MacWindow({ width = 1280, height = 820, children }) {
+  return (
+    <div style={{
+      width, height, borderRadius: 12, overflow: 'hidden',
+      background: '#1c1c1e',
+      boxShadow: '0 0 0 0.5px rgba(255,255,255,0.12), 0 30px 80px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.4)',
+      display: 'flex', position: 'relative',
+      fontFamily: MAC_FONT,
+      color: 'rgba(255,255,255,0.92)',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+Object.assign(window, { MacWindow, TrafficLights, MAC_FONT, MAC_MONO });
+
+
+// ===== sidebar.jsx =====
+// LocalChat sidebar — conversation history, grouped by date
+
+function SidebarIcon({ name, size = 14, color = 'rgba(255,255,255,0.6)' }) {
+  const s = size;
+  const stroke = color;
+  const paths = {
+    plus: <path d="M8 3v10M3 8h10" stroke={stroke} strokeWidth="1.4" strokeLinecap="round"/>,
+    search: (<><circle cx="7" cy="7" r="4.5" stroke={stroke} strokeWidth="1.4"/><path d="M10.5 10.5L13 13" stroke={stroke} strokeWidth="1.4" strokeLinecap="round"/></>),
+    sidebar: (<><rect x="2" y="3" width="12" height="10" rx="2" stroke={stroke} strokeWidth="1.2"/><line x1="6" y1="3" x2="6" y2="13" stroke={stroke} strokeWidth="1.2"/></>),
+    chat: <path d="M3 7a4 4 0 014-4h2a4 4 0 014 4v1a4 4 0 01-4 4H7l-3 2v-2.5A4 4 0 013 8.5V7z" stroke={stroke} strokeWidth="1.2" fill="none"/>,
+    pin: <path d="M8 2v5l2 2v1H6v-1l2-2V2z M8 10v4" stroke={stroke} strokeWidth="1.2" strokeLinecap="round" fill="none"/>,
+    folder: <path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z" stroke={stroke} strokeWidth="1.2" fill="none"/>,
+    more: (<><circle cx="3.5" cy="8" r="1.1" fill={stroke}/><circle cx="8" cy="8" r="1.1" fill={stroke}/><circle cx="12.5" cy="8" r="1.1" fill={stroke}/></>),
+    settings: (<><circle cx="8" cy="8" r="2.2" stroke={stroke} strokeWidth="1.2" fill="none"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3" stroke={stroke} strokeWidth="1.2" strokeLinecap="round"/></>),
+    trash: <path d="M3 4h10M5.5 4V2.5A0.5.5 0 016 2h4a0.5.5 0 01.5.5V4M4.5 4l0.5 9a1 1 0 001 1h4a1 1 0 001-1l0.5-9" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/>,
+  };
+  return (
+    <svg width={s} height={s} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      {paths[name]}
+    </svg>
+  );
+}
+
+function ConversationItem({ title, preview, time, selected, pinned, onClick, density }) {
+  const compact = density === 'compact';
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: compact ? '6px 10px' : '8px 10px',
+        borderRadius: 6,
+        background: selected ? 'rgba(255,255,255,0.08)' : 'transparent',
+        cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', gap: 2,
+        position: 'relative',
+        transition: 'background 0.1s',
+      }}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between' }}>
+        <span style={{
+          fontSize: 12.5, fontWeight: 500,
+          color: 'rgba(255,255,255,0.95)',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          flex: 1,
+        }}>{title}</span>
+        {pinned && <SidebarIcon name="pin" size={10} color="rgba(255,255,255,0.4)" />}
+      </div>
+      {!compact && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'space-between' }}>
+          <span style={{
+            fontSize: 11, color: 'rgba(255,255,255,0.45)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            flex: 1,
+          }}>{preview}</span>
+          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{time}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarSection({ title, children }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{
+        padding: '0 12px 4px',
+        fontSize: 10.5, fontWeight: 600,
+        color: 'rgba(255,255,255,0.4)',
+        letterSpacing: 0.3, textTransform: 'uppercase',
+      }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Sidebar({ selectedId, onSelect, onNewChat, density, onToggle }) {
+  const conversations = [
+    { section: 'Pinned', items: [
+      { id: 'p1', title: 'Rust async patterns', preview: 'tokio vs async-std comparison…', time: 'Pin', pinned: true },
+    ]},
+    { section: 'Today', items: [
+      { id: 't1', title: 'SwiftUI navigation split view', preview: 'how do I hide the sidebar toggle…', time: '14:22' },
+      { id: 't2', title: 'llama.cpp quantization Q4_K_M', preview: 'What is the perplexity delta…', time: '11:04' },
+      { id: 't3', title: 'CoreData vs SwiftData', preview: 'migration strategies for…', time: '09:47' },
+    ]},
+    { section: 'Yesterday', items: [
+      { id: 'y1', title: 'Debug metal shader compiler', preview: 'fragment shader crashes on M1…', time: 'Tue' },
+      { id: 'y2', title: 'GGUF file format specification', preview: 'header structure for tensors…', time: 'Tue' },
+    ]},
+    { section: 'Previous 7 days', items: [
+      { id: 'w1', title: 'Merge sort in Swift', preview: 'generic over Comparable…', time: 'Mon' },
+      { id: 'w2', title: 'Prompt engineering 7B models', preview: 'system prompt strategies…', time: 'Sun' },
+      { id: 'w3', title: 'Local embeddings with BGE', preview: 'compare to OpenAI ada-002…', time: 'Sat' },
+      { id: 'w4', title: 'MLX framework intro', preview: 'apple silicon unified memory…', time: 'Fri' },
+    ]},
+    { section: 'Older', items: [
+      { id: 'o1', title: 'Vector DB local setup', preview: 'qdrant vs chroma…', time: 'Apr 11' },
+      { id: 'o2', title: 'Whisper.cpp integration', preview: 'stream audio to transcript…', time: 'Apr 8' },
+    ]},
+  ];
+
+  return (
+    <div style={{
+      width: 260, height: '100%', flexShrink: 0,
+      background: 'rgba(40,40,42,0.72)',
+      backdropFilter: 'blur(40px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+      borderRight: '0.5px solid rgba(255,255,255,0.08)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Top: traffic lights + sidebar toggle */}
+      <div style={{
+        height: 44, display: 'flex', alignItems: 'center',
+        padding: '0 12px', gap: 12,
+        WebkitAppRegion: 'drag',
+      }}>
+        <TrafficLights />
+        <div style={{ flex: 1 }} />
+        <div
+          onClick={onToggle}
+          style={{
+            width: 24, height: 24, borderRadius: 5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        >
+          <SidebarIcon name="sidebar" size={14} />
+        </div>
+      </div>
+
+      {/* New chat + search */}
+      <div style={{ padding: '0 10px 8px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <button
+          onClick={onNewChat}
+          style={{
+            height: 28, borderRadius: 6,
+            background: 'rgba(255,255,255,0.06)',
+            border: '0.5px solid rgba(255,255,255,0.1)',
+            color: 'rgba(255,255,255,0.92)',
+            fontSize: 12.5, fontWeight: 500,
+            fontFamily: MAC_FONT,
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '0 10px', cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <SidebarIcon name="plus" size={12} color="rgba(255,255,255,0.8)" />
+          <span>New chat</span>
+          <div style={{ flex: 1 }} />
+          <kbd style={{
+            fontSize: 10, color: 'rgba(255,255,255,0.45)',
+            fontFamily: MAC_FONT,
+          }}>⌘N</kbd>
+        </button>
+
+        <div style={{
+          height: 26, borderRadius: 6,
+          background: 'rgba(0,0,0,0.22)',
+          border: '0.5px solid rgba(255,255,255,0.06)',
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0 8px',
+        }}>
+          <SidebarIcon name="search" size={12} color="rgba(255,255,255,0.4)" />
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>Search conversations</span>
+          <div style={{ flex: 1 }} />
+          <kbd style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>⌘F</kbd>
+        </div>
+      </div>
+
+      {/* Conversation list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px 12px' }}>
+        {conversations.map((sec) => (
+          <SidebarSection key={sec.section} title={sec.section}>
+            {sec.items.map((c) => (
+              <ConversationItem
+                key={c.id}
+                title={c.title}
+                preview={c.preview}
+                time={c.time}
+                pinned={c.pinned}
+                selected={selectedId === c.id}
+                onClick={() => onSelect(c.id)}
+                density={density}
+              />
+            ))}
+          </SidebarSection>
+        ))}
+      </div>
+
+      {/* Footer: user / settings */}
+      <div style={{
+        height: 44, padding: '0 10px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        borderTop: '0.5px solid rgba(255,255,255,0.06)',
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #6a5acd, #4a90e2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 600, color: '#fff',
+        }}>LC</div>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', flex: 1 }}>Local user</span>
+        <div style={{
+          width: 24, height: 24, borderRadius: 5,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+        }}>
+          <SidebarIcon name="settings" size={14} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Sidebar, SidebarIcon, ConversationItem });
+
+
+// ===== toolbar.jsx =====
+// Toolbar: model dropdown, runtime indicator, action buttons
+
+function Chevron({ dir = 'down', size = 10, color = 'rgba(255,255,255,0.55)' }) {
+  const rot = { down: 0, up: 180, left: 90, right: -90 }[dir];
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" style={{ transform: `rotate(${rot}deg)` }}>
+      <path d="M2 3.5l3 3 3-3" stroke={color} strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ToolbarIcon({ name, size = 14, color = 'rgba(255,255,255,0.7)' }) {
+  const stroke = color;
+  const paths = {
+    sidebar: (<><rect x="2" y="3" width="12" height="10" rx="2" stroke={stroke} strokeWidth="1.2"/><line x1="6" y1="3" x2="6" y2="13" stroke={stroke} strokeWidth="1.2"/></>),
+    share: (<><path d="M8 2v8M5 5l3-3 3 3" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/><path d="M3 9v4a1 1 0 001 1h8a1 1 0 001-1V9" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/></>),
+    inspector: (<><rect x="2" y="3" width="12" height="10" rx="2" stroke={stroke} strokeWidth="1.2"/><line x1="11" y1="3" x2="11" y2="13" stroke={stroke} strokeWidth="1.2"/></>),
+    info: (<><circle cx="8" cy="8" r="6" stroke={stroke} strokeWidth="1.2"/><path d="M8 7v4M8 5v0.5" stroke={stroke} strokeWidth="1.2" strokeLinecap="round"/></>),
+    dots: (<><circle cx="8" cy="3.5" r="1.2" fill={stroke}/><circle cx="8" cy="8" r="1.2" fill={stroke}/><circle cx="8" cy="12.5" r="1.2" fill={stroke}/></>),
+    download: <path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+    cpu: (<><rect x="4" y="4" width="8" height="8" rx="1" stroke={stroke} strokeWidth="1.2"/><rect x="6" y="6" width="4" height="4" stroke={stroke} strokeWidth="1" fill="none"/><path d="M6 2v2M10 2v2M6 12v2M10 12v2M2 6h2M2 10h2M12 6h2M12 10h2" stroke={stroke} strokeWidth="1"/></>),
+    gpu: <path d="M2 5a1 1 0 011-1h10a1 1 0 011 1v5a1 1 0 01-1 1h-2l-1 2h-4l-1-2H3a1 1 0 01-1-1V5z" stroke={stroke} strokeWidth="1.2" fill="none"/>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      {paths[name]}
+    </svg>
+  );
+}
+
+function ToolbarButton({ icon, label, active, onClick, disabled, compact }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        height: 26, padding: label ? '0 10px' : 0,
+        width: label ? 'auto' : 26,
+        borderRadius: 6,
+        background: active ? 'rgba(255,255,255,0.12)' : hover && !disabled ? 'rgba(255,255,255,0.06)' : 'transparent',
+        border: 'none',
+        color: 'rgba(255,255,255,0.85)',
+        fontSize: 12, fontFamily: MAC_FONT,
+        display: 'flex', alignItems: 'center', gap: 5,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        transition: 'background 0.1s',
+      }}
+    >
+      {icon}
+      {label && <span>{label}</span>}
+    </button>
+  );
+}
+
+function ModelPill({ model, status, onClick, onOpenLibrary }) {
+  const [hover, setHover] = React.useState(false);
+  const statusColor = {
+    ready: '#30d158',
+    loading: '#ff9f0a',
+    unloaded: 'rgba(255,255,255,0.3)',
+    error: '#ff453a',
+  }[status];
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        height: 28, padding: '0 10px 0 8px',
+        borderRadius: 7,
+        background: hover ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)',
+        border: '0.5px solid rgba(255,255,255,0.1)',
+        display: 'flex', alignItems: 'center', gap: 8,
+        cursor: 'pointer',
+        fontFamily: MAC_FONT,
+        color: 'rgba(255,255,255,0.92)',
+        minWidth: 0,
+      }}
+    >
+      {/* status dot with pulse if loading */}
+      <div style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '50%',
+          background: statusColor,
+          boxShadow: status === 'ready' ? `0 0 6px ${statusColor}` : 'none',
+        }} />
+        {status === 'loading' && (
+          <div style={{
+            position: 'absolute', inset: -2, borderRadius: '50%',
+            border: `1px solid ${statusColor}`,
+            animation: 'pulse 1.4s ease-out infinite',
+          }} />
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0, minWidth: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.15, whiteSpace: 'nowrap' }}>
+          {model.name}
+        </span>
+        <span style={{
+          fontSize: 10, color: 'rgba(255,255,255,0.5)',
+          fontFamily: MAC_MONO, lineHeight: 1.15,
+        }}>
+          {model.quant} · {model.size}
+        </span>
+      </div>
+
+      <Chevron dir="down" size={9} />
+    </button>
+  );
+}
+
+function Toolbar({
+  sidebarCollapsed, onToggleSidebar,
+  inspectorOpen, onToggleInspector,
+  currentModel, modelStatus,
+  onOpenModelLibrary,
+  conversationTitle,
+}) {
+  return (
+    <div style={{
+      height: 48, flexShrink: 0,
+      borderBottom: '0.5px solid rgba(255,255,255,0.08)',
+      background: 'rgba(30,30,32,0.72)',
+      backdropFilter: 'blur(40px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+      display: 'flex', alignItems: 'center',
+      padding: '0 10px', gap: 6,
+      WebkitAppRegion: 'drag',
+    }}>
+      {sidebarCollapsed && (
+        <>
+          <TrafficLights />
+          <div style={{ width: 6 }} />
+        </>
+      )}
+
+      {sidebarCollapsed && (
+        <ToolbarButton
+          icon={<ToolbarIcon name="sidebar" />}
+          onClick={onToggleSidebar}
+        />
+      )}
+
+      {/* Conversation title */}
+      <div style={{
+        fontSize: 13, fontWeight: 600,
+        color: 'rgba(255,255,255,0.88)',
+        padding: '0 6px',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        maxWidth: 280,
+      }}>{conversationTitle}</div>
+
+      <div style={{ flex: 1 }} />
+
+      {/* Model selector pill */}
+      <ModelPill
+        model={currentModel}
+        status={modelStatus}
+        onClick={onOpenModelLibrary}
+      />
+
+      <div style={{ width: 4 }} />
+
+      <ToolbarButton icon={<ToolbarIcon name="share" />} />
+      <ToolbarButton icon={<ToolbarIcon name="dots" />} />
+    </div>
+  );
+}
+
+Object.assign(window, { Toolbar, ToolbarButton, ToolbarIcon, Chevron, ModelPill });
+
+
+// ===== chat.jsx =====
+// Chat area: messages, streaming cursor, input with send/stop
+
+function ChatIcon({ name, size = 14, color = 'rgba(255,255,255,0.6)' }) {
+  const stroke = color;
+  const paths = {
+    send: <path d="M2.5 8L13.5 3l-2 10-3-4-5-1z" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>,
+    stop: <rect x="4" y="4" width="8" height="8" rx="1" fill={stroke}/>,
+    attach: <path d="M11 4l-6 6a2.5 2.5 0 003.5 3.5l6-6a4 4 0 00-5.7-5.7l-5.5 5.5a5.5 5.5 0 007.7 7.7l6-6" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/>,
+    mic: (<><rect x="6" y="2" width="4" height="8" rx="2" stroke={stroke} strokeWidth="1.2" fill="none"/><path d="M3 8a5 5 0 0010 0M8 13v1" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/></>),
+    copy: (<><rect x="5" y="5" width="8" height="8" rx="1.5" stroke={stroke} strokeWidth="1.1" fill="none"/><path d="M3 11V4a1 1 0 011-1h7" stroke={stroke} strokeWidth="1.1" fill="none" strokeLinecap="round"/></>),
+    refresh: <path d="M13 3v3h-3M3 13v-3h3M13 6a5 5 0 00-9.5-1M3 10a5 5 0 009.5 1" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/>,
+    edit: <path d="M11 2l3 3-8 8H3v-3l8-8z" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinejoin="round"/>,
+    thumbUp: <path d="M5 7V13H3V7h2zm0 0l3-5c1 0 2 .5 2 2l-.5 2.5H13a1 1 0 011 1.2l-1 4a1 1 0 01-1 .8H6" stroke={stroke} strokeWidth="1.1" fill="none" strokeLinejoin="round"/>,
+    branch: <path d="M4 2v12M12 2v4a3 3 0 01-3 3H4" stroke={stroke} strokeWidth="1.2" fill="none" strokeLinecap="round"/>,
+    sparkle: <path d="M8 2l1.2 3.5L13 7l-3.8 1.5L8 12 6.8 8.5 3 7l3.8-1.5L8 2z" stroke={stroke} strokeWidth="1" fill="none" strokeLinejoin="round"/>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      {paths[name]}
+    </svg>
+  );
+}
+
+// Simple syntax-colored code block (placeholder highlighting)
+function CodeBlock({ language = 'swift', code }) {
+  return (
+    <div style={{
+      borderRadius: 8,
+      background: 'rgba(0,0,0,0.35)',
+      border: '0.5px solid rgba(255,255,255,0.08)',
+      margin: '8px 0',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        height: 28, padding: '0 10px',
+        display: 'flex', alignItems: 'center',
+        borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+        background: 'rgba(255,255,255,0.02)',
+      }}>
+        <span style={{
+          fontSize: 10.5, fontFamily: MAC_MONO,
+          color: 'rgba(255,255,255,0.45)',
+          textTransform: 'uppercase', letterSpacing: 0.3,
+        }}>{language}</span>
+        <div style={{ flex: 1 }} />
+        <button style={{
+          background: 'none', border: 'none', padding: '2px 4px',
+          color: 'rgba(255,255,255,0.45)',
+          fontSize: 10.5, fontFamily: MAC_FONT,
+          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+        }}>
+          <ChatIcon name="copy" size={11} color="rgba(255,255,255,0.45)" />
+          Copy
+        </button>
+      </div>
+      <pre style={{
+        margin: 0, padding: '10px 12px',
+        fontFamily: MAC_MONO, fontSize: 12, lineHeight: 1.55,
+        color: 'rgba(255,255,255,0.88)',
+        overflow: 'auto',
+      }}>
+        <code dangerouslySetInnerHTML={{ __html: code }} />
+      </pre>
+    </div>
+  );
+}
+
+const codeColor = {
+  kw: '#ff7ab3',      // keyword - pink
+  type: '#78c8ff',    // type - blue
+  str: '#ffa657',     // string - orange
+  num: '#a5d6ff',     // number - light blue
+  com: '#6e7681',     // comment - gray
+  fn: '#c792ea',      // function - purple
+  prop: '#9ecbff',    // property - sky
+};
+const c = (cls, txt) => `<span style="color:${codeColor[cls]}">${txt}</span>`;
+
+function MessageActions({ onRegenerate }) {
+  const btn = (icon) => (
+    <div style={{
+      width: 24, height: 24, borderRadius: 5,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'pointer',
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+    >{icon}</div>
+  );
+  return (
+    <div style={{ display: 'flex', gap: 2, marginTop: 6, marginLeft: -4 }}>
+      {btn(<ChatIcon name="copy" size={12} color="rgba(255,255,255,0.5)" />)}
+      {btn(<ChatIcon name="refresh" size={12} color="rgba(255,255,255,0.5)" />)}
+      {btn(<ChatIcon name="branch" size={12} color="rgba(255,255,255,0.5)" />)}
+      {btn(<ChatIcon name="thumbUp" size={12} color="rgba(255,255,255,0.5)" />)}
+    </div>
+  );
+}
+
+function UserMessage({ content, layout }) {
+  if (layout === 'chat-bubble') {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '6px 0' }}>
+        <div style={{
+          maxWidth: '75%',
+          background: 'rgba(10,132,255,0.18)',
+          border: '0.5px solid rgba(10,132,255,0.25)',
+          padding: '9px 12px',
+          borderRadius: 12,
+          fontSize: 13.5, lineHeight: 1.55,
+          color: 'rgba(255,255,255,0.95)',
+        }}>{content}</div>
+      </div>
+    );
+  }
+  // document layout (Claude-like)
+  return (
+    <div style={{
+      display: 'flex', gap: 12,
+      padding: '12px 0',
+    }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #6a5acd, #4a90e2)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, fontWeight: 600, color: '#fff', flexShrink: 0,
+        marginTop: 2,
+      }}>LC</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 11.5, fontWeight: 600,
+          color: 'rgba(255,255,255,0.55)',
+          marginBottom: 4,
+        }}>You</div>
+        <div style={{
+          fontSize: 13.5, lineHeight: 1.6,
+          color: 'rgba(255,255,255,0.92)',
+        }}>{content}</div>
+      </div>
+    </div>
+  );
+}
+
+function MetricsFooter({ ttft, tokPerSec, promptTokens, responseTokens }) {
+  const Item = ({ label, value, unit }) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <span style={{
+        fontSize: 10.5, color: 'rgba(255,255,255,0.45)',
+        fontFamily: MAC_FONT, letterSpacing: 0.1,
+      }}>{label}</span>
+      <span style={{
+        fontSize: 11, fontFamily: MAC_MONO,
+        color: 'rgba(255,255,255,0.85)',
+        fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+      }}>
+        {value}
+        {unit && <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, marginLeft: 1 }}>{unit}</span>}
+      </span>
+    </div>
+  );
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 14,
+      marginTop: 10, padding: '7px 10px',
+      borderRadius: 6,
+      background: 'rgba(255,255,255,0.025)',
+      border: '0.5px solid rgba(255,255,255,0.06)',
+      width: 'fit-content',
+    }}>
+      <Item label="TTFT" value={ttft} unit="ms" />
+      <span style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+      <Item label="speed" value={tokPerSec} unit="tok/s" />
+      <span style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+      <Item label="prompt" value={promptTokens} unit="tok" />
+      <span style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+      <Item label="response" value={responseTokens} unit="tok" />
+      <span style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+      <Item label="total" value={promptTokens + responseTokens} unit="tok" />
+    </div>
+  );
+}
+
+function AssistantMessage({ children, modelName, streaming, layout, showActions = true, metrics }) {
+  return (
+    <div style={{
+      display: 'flex', gap: 12,
+      padding: '12px 0',
+    }}>
+      <div style={{
+        width: 24, height: 24, borderRadius: 6,
+        background: 'rgba(255,255,255,0.08)',
+        border: '0.5px solid rgba(255,255,255,0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0, marginTop: 2,
+      }}>
+        <ChatIcon name="sparkle" size={12} color="rgba(255,255,255,0.75)" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize: 11.5, fontWeight: 600,
+          color: 'rgba(255,255,255,0.55)',
+          marginBottom: 4,
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <span>{modelName}</span>
+          {streaming && (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.3)' }}>·</span>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                color: '#30d158',
+              }}>
+                <span style={{
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: '#30d158',
+                  animation: 'pulse 1.4s ease-out infinite',
+                }} />
+                generating
+              </span>
+            </>
+          )}
+        </div>
+        <div style={{
+          fontSize: 13.5, lineHeight: 1.65,
+          color: 'rgba(255,255,255,0.92)',
+        }}>
+          {children}
+          {streaming && (
+            <span style={{
+              display: 'inline-block', width: 8, height: 15,
+              background: 'rgba(255,255,255,0.7)',
+              marginLeft: 2, verticalAlign: 'text-bottom',
+              animation: 'blink 1s infinite',
+            }} />
+          )}
+        </div>
+        {!streaming && metrics && <MetricsFooter {...metrics} />}
+        {showActions && !streaming && <MessageActions />}
+      </div>
+    </div>
+  );
+}
+
+// ─────── Input area ───────
+function Composer({ isGenerating, onSend, onStop, density }) {
+  const [text, setText] = React.useState('');
+  const [focused, setFocused] = React.useState(false);
+
+  const handleSend = () => {
+    if (!text.trim() || isGenerating) return;
+    onSend(text);
+    setText('');
+  };
+
+  return (
+    <div style={{
+      padding: density === 'compact' ? '6px 16px 12px' : '10px 24px 18px',
+      flexShrink: 0,
+    }}>
+      <div style={{
+        maxWidth: 760, margin: '0 auto',
+        borderRadius: 14,
+        background: 'rgba(255,255,255,0.04)',
+        border: focused
+          ? '0.5px solid rgba(10,132,255,0.5)'
+          : '0.5px solid rgba(255,255,255,0.1)',
+        boxShadow: focused
+          ? '0 0 0 3px rgba(10,132,255,0.12), 0 4px 16px rgba(0,0,0,0.25)'
+          : '0 4px 16px rgba(0,0,0,0.2)',
+        transition: 'all 0.15s',
+        overflow: 'hidden',
+      }}>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder="Message Llama 3.1 8B Instruct…"
+          rows={1}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            resize: 'none',
+            padding: '12px 16px 4px',
+            color: 'rgba(255,255,255,0.95)',
+            fontFamily: MAC_FONT,
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            minHeight: 24,
+            maxHeight: 200,
+          }}
+        />
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '6px 8px 8px 10px', gap: 4,
+        }}>
+          <button style={{
+            width: 26, height: 26, borderRadius: 6,
+            background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+            <ChatIcon name="attach" size={14} />
+          </button>
+          <button style={{
+            width: 26, height: 26, borderRadius: 6,
+            background: 'transparent', border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+          }}>
+            <ChatIcon name="mic" size={14} />
+          </button>
+
+          {/* inline parameter hint */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            marginLeft: 6, paddingLeft: 10,
+            borderLeft: '0.5px solid rgba(255,255,255,0.08)',
+            fontSize: 11, fontFamily: MAC_MONO,
+            color: 'rgba(255,255,255,0.4)',
+          }}>
+            <span>temp 0.7</span>
+            <span>top_p 0.9</span>
+            <span>ctx 8k</span>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          <span style={{
+            fontSize: 11, color: 'rgba(255,255,255,0.35)',
+            fontFamily: MAC_FONT, marginRight: 6,
+          }}>
+            {text.length > 0 ? `${text.length} chars` : 'Enter to send · Shift+Enter for newline'}
+          </span>
+
+          {isGenerating ? (
+            <button
+              onClick={onStop}
+              style={{
+                height: 28, padding: '0 12px', borderRadius: 7,
+                background: 'rgba(255,69,58,0.18)',
+                border: '0.5px solid rgba(255,69,58,0.4)',
+                color: '#ff6961',
+                fontSize: 12, fontWeight: 600, fontFamily: MAC_FONT,
+                display: 'flex', alignItems: 'center', gap: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <ChatIcon name="stop" size={10} color="#ff6961" />
+              Stop
+              <kbd style={{ fontSize: 10, opacity: 0.7, marginLeft: 2 }}>⌘⏎</kbd>
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!text.trim()}
+              style={{
+                height: 28, width: 28, borderRadius: 7,
+                background: text.trim() ? '#0a84ff' : 'rgba(255,255,255,0.06)',
+                border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: text.trim() ? 'pointer' : 'default',
+                transition: 'background 0.1s',
+                boxShadow: text.trim() ? '0 2px 6px rgba(10,132,255,0.3)' : 'none',
+              }}
+            >
+              <ChatIcon name="send" size={13} color={text.trim() ? '#fff' : 'rgba(255,255,255,0.3)'} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, {
+  UserMessage, AssistantMessage, CodeBlock, Composer, ChatIcon, MessageActions, MetricsFooter, c,
+});
+
+
+// ===== inspector.jsx =====
+// Right-side inspector panel: generation parameters + live metrics
+
+function MetricRow({ label, value, unit, accent }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+      padding: '6px 0',
+    }}>
+      <span style={{
+        fontSize: 11.5, color: 'rgba(255,255,255,0.5)',
+        fontFamily: MAC_FONT,
+      }}>{label}</span>
+      <span style={{
+        fontSize: 13, fontFamily: MAC_MONO,
+        color: accent || 'rgba(255,255,255,0.95)',
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {value}
+        {unit && <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: 3, fontSize: 10.5 }}>{unit}</span>}
+      </span>
+    </div>
+  );
+}
+
+function Sparkline({ data, color = '#30d158', height = 32 }) {
+  const max = Math.max(...data, 1);
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const w = 100;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = height - ((v - min) / range) * (height - 4) - 2;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} style={{ width: '100%', height, display: 'block' }} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.2" strokeLinejoin="round" />
+      <polygon points={`0,${height} ${points} ${w},${height}`} fill="url(#spark-grad)" />
+    </svg>
+  );
+}
+
+function ContextBar({ used, total }) {
+  const pct = (used / total) * 100;
+  const warn = pct > 75;
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+        <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>Context window</span>
+        <span style={{
+          fontSize: 11, fontFamily: MAC_MONO,
+          color: 'rgba(255,255,255,0.7)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {used.toLocaleString()} / {total.toLocaleString()}
+        </span>
+      </div>
+      <div style={{
+        height: 4, borderRadius: 2, overflow: 'hidden',
+        background: 'rgba(255,255,255,0.06)',
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: warn ? '#ff9f0a' : '#0a84ff',
+          borderRadius: 2,
+        }} />
+      </div>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 10, fontFamily: MAC_MONO,
+        color: 'rgba(255,255,255,0.35)', marginTop: 3,
+      }}>
+        <span>{pct.toFixed(1)}% used</span>
+        <span>{(total - used).toLocaleString()} free</span>
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children, collapsible }) {
+  const [open, setOpen] = React.useState(true);
+  return (
+    <div style={{ borderBottom: '0.5px solid rgba(255,255,255,0.06)', padding: '12px 16px' }}>
+      <div
+        onClick={() => collapsible && setOpen(!open)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          cursor: collapsible ? 'pointer' : 'default',
+          marginBottom: open ? 6 : 0,
+        }}
+      >
+        {collapsible && (
+          <Chevron dir={open ? 'down' : 'right'} size={9} color="rgba(255,255,255,0.45)" />
+        )}
+        <span style={{
+          fontSize: 10.5, fontWeight: 600,
+          color: 'rgba(255,255,255,0.55)',
+          letterSpacing: 0.3, textTransform: 'uppercase',
+        }}>{title}</span>
+      </div>
+      {open && <div style={{ marginTop: 4 }}>{children}</div>}
+    </div>
+  );
+}
+
+function Slider({ label, value, min, max, step = 0.01, onChange }) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div style={{ padding: '5px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
+        <span style={{
+          fontSize: 11, fontFamily: MAC_MONO,
+          color: 'rgba(255,255,255,0.9)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>{typeof value === 'number' ? value.toFixed(step < 1 ? 2 : 0) : value}</span>
+      </div>
+      <div style={{ position: 'relative', height: 18, display: 'flex', alignItems: 'center' }}>
+        <div style={{
+          width: '100%', height: 3, borderRadius: 2,
+          background: 'rgba(255,255,255,0.08)',
+        }} />
+        <div style={{
+          position: 'absolute', left: 0, top: '50%',
+          transform: 'translateY(-50%)',
+          width: `${pct}%`, height: 3, borderRadius: 2,
+          background: '#0a84ff',
+        }} />
+        <div style={{
+          position: 'absolute', left: `${pct}%`, top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 12, height: 12, borderRadius: '50%',
+          background: '#fff',
+          boxShadow: '0 0 0 0.5px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.3)',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function Inspector({ streaming, modelStatus, sparkData, tokPerSec, ttft, tokensUsed, contextTotal }) {
+  return (
+    <div style={{
+      width: 280, flexShrink: 0, height: '100%',
+      background: 'rgba(28,28,30,0.85)',
+      backdropFilter: 'blur(30px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+      borderLeft: '0.5px solid rgba(255,255,255,0.08)',
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        height: 36, padding: '0 16px',
+        display: 'flex', alignItems: 'center',
+        borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+      }}>
+        <span style={{
+          fontSize: 11, fontWeight: 600,
+          color: 'rgba(255,255,255,0.65)',
+          letterSpacing: 0.3, textTransform: 'uppercase',
+        }}>Inspector</span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+
+        {/* Live metrics */}
+        <Section title="Performance">
+          <div style={{
+            display: 'flex', alignItems: 'baseline', gap: 8,
+            margin: '4px 0 2px',
+          }}>
+            <span style={{
+              fontSize: 28, fontFamily: MAC_MONO, fontWeight: 500,
+              color: streaming ? '#30d158' : 'rgba(255,255,255,0.9)',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1,
+            }}>{tokPerSec.toFixed(1)}</span>
+            <span style={{
+              fontSize: 11, color: 'rgba(255,255,255,0.5)',
+              fontFamily: MAC_MONO,
+            }}>tok/s</span>
+            <div style={{ flex: 1 }} />
+            {streaming && (
+              <span style={{
+                fontSize: 10, padding: '2px 6px', borderRadius: 3,
+                background: 'rgba(48,209,88,0.15)',
+                color: '#30d158',
+                fontFamily: MAC_FONT, fontWeight: 500,
+              }}>LIVE</span>
+            )}
+          </div>
+          <div style={{ margin: '4px -2px 0' }}>
+            <Sparkline data={sparkData} color={streaming ? '#30d158' : 'rgba(255,255,255,0.3)'} />
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <MetricRow label="Time to first token" value={ttft} unit="ms" />
+            <MetricRow label="Tokens generated" value={Math.floor(sparkData.reduce((a,b)=>a+b,0)/sparkData.length * 4).toString()} />
+            <MetricRow label="Decode time" value="2.14" unit="s" />
+          </div>
+        </Section>
+
+        {/* Context usage */}
+        <Section title="Context">
+          <ContextBar used={tokensUsed} total={contextTotal} />
+          <div style={{ marginTop: 10 }}>
+            <MetricRow label="System prompt" value="412" unit="tok" />
+            <MetricRow label="History" value={(tokensUsed - 412 - 180).toLocaleString()} unit="tok" />
+            <MetricRow label="Current turn" value="180" unit="tok" />
+          </div>
+        </Section>
+
+        {/* Generation parameters */}
+        <Section title="Sampling" collapsible>
+          <Slider label="Temperature" value={0.70} min={0} max={2} step={0.01} />
+          <Slider label="Top P" value={0.90} min={0} max={1} step={0.01} />
+          <Slider label="Top K" value={40} min={0} max={100} step={1} />
+          <Slider label="Repeat penalty" value={1.10} min={1} max={2} step={0.01} />
+          <Slider label="Max tokens" value={2048} min={64} max={8192} step={64} />
+        </Section>
+
+        {/* Model runtime */}
+        <Section title="Runtime" collapsible>
+          <MetricRow label="Backend" value="llama.cpp" />
+          <MetricRow label="Device" value="Metal (M3 Pro)" />
+          <MetricRow label="GPU layers" value="33 / 33" accent="#30d158" />
+          <MetricRow label="Quantization" value="Q4_K_M" />
+          <MetricRow label="Batch size" value="512" />
+        </Section>
+
+        {/* Resources */}
+        <Section title="Resources">
+          <MetricRow label="VRAM" value="6.2" unit="GB / 18 GB" />
+          <div style={{
+            height: 3, borderRadius: 2, marginTop: 2, marginBottom: 8,
+            background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+          }}>
+            <div style={{ width: '34%', height: '100%', background: '#bf5af2' }} />
+          </div>
+          <MetricRow label="CPU" value="22" unit="%" />
+          <div style={{
+            height: 3, borderRadius: 2, marginTop: 2, marginBottom: 8,
+            background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+          }}>
+            <div style={{ width: '22%', height: '100%', background: '#0a84ff' }} />
+          </div>
+          <MetricRow label="GPU" value={streaming ? "78" : "4"} unit="%" accent={streaming ? '#30d158' : undefined} />
+          <div style={{
+            height: 3, borderRadius: 2, marginTop: 2,
+            background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: streaming ? '78%' : '4%', height: '100%',
+              background: '#30d158',
+              transition: 'width 0.5s',
+            }} />
+          </div>
+        </Section>
+
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Inspector, Sparkline, MetricRow, Slider, Section, ContextBar });
+
+
+// ===== model-library.jsx =====
+// Model library modal + custom path loader sheet
+
+function ModelFileIcon({ color = '#0a84ff' }) {
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: 8,
+      background: `linear-gradient(135deg, ${color}, ${color}99)`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+      boxShadow: `0 2px 8px ${color}33`,
+    }}>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M4 3a1 1 0 011-1h6l4 4v9a1 1 0 01-1 1H5a1 1 0 01-1-1V3z" stroke="#fff" strokeWidth="1.3" fill="none"/>
+        <path d="M11 2v4h4" stroke="#fff" strokeWidth="1.3" fill="none"/>
+        <text x="9" y="13" fontSize="4.5" fontFamily="SF Mono, monospace" fontWeight="700" fill="#fff" textAnchor="middle">GGUF</text>
+      </svg>
+    </div>
+  );
+}
+
+function ModelRow({ model, onLoad, loading, progress }) {
+  const [hover, setHover] = React.useState(false);
+  const status = model.status;
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: 12,
+        background: hover ? 'rgba(255,255,255,0.04)' : 'transparent',
+        borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+        cursor: 'pointer',
+      }}>
+      <ModelFileIcon color={model.color} />
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.95)' }}>
+            {model.name}
+          </span>
+          {model.active && (
+            <span style={{
+              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+              background: 'rgba(48,209,88,0.18)',
+              color: '#30d158', fontWeight: 500,
+            }}>ACTIVE</span>
+          )}
+          {model.recommended && (
+            <span style={{
+              fontSize: 10, padding: '1px 6px', borderRadius: 3,
+              background: 'rgba(10,132,255,0.18)',
+              color: '#64b5ff', fontWeight: 500,
+            }}>RECOMMENDED</span>
+          )}
+        </div>
+        <div style={{
+          display: 'flex', gap: 10,
+          fontSize: 11, fontFamily: MAC_MONO,
+          color: 'rgba(255,255,255,0.5)',
+        }}>
+          <span>{model.params}</span>
+          <span>·</span>
+          <span>{model.quant}</span>
+          <span>·</span>
+          <span>{model.size}</span>
+          <span>·</span>
+          <span>{model.ctx} ctx</span>
+        </div>
+      </div>
+
+      {loading && (
+        <div style={{ width: 140, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+          <div style={{
+            fontSize: 11, fontFamily: MAC_MONO,
+            color: 'rgba(255,255,255,0.75)',
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            {progress}% · 42 MB/s
+          </div>
+          <div style={{
+            width: '100%', height: 4, borderRadius: 2,
+            background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${progress}%`, height: '100%',
+              background: 'linear-gradient(90deg, #0a84ff, #64b5ff)',
+              transition: 'width 0.3s',
+            }} />
+          </div>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: MAC_MONO }}>
+            {((100 - progress) * 0.05).toFixed(1)}s remaining
+          </span>
+        </div>
+      )}
+
+      {!loading && status === 'downloaded' && (
+        <button style={{
+          height: 26, padding: '0 12px', borderRadius: 6,
+          background: model.active ? 'transparent' : 'rgba(255,255,255,0.08)',
+          border: model.active ? '0.5px solid rgba(255,255,255,0.12)' : 'none',
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: 12, fontWeight: 500, fontFamily: MAC_FONT,
+          cursor: 'pointer',
+        }} onClick={onLoad}>
+          {model.active ? 'Loaded' : 'Load'}
+        </button>
+      )}
+
+      {!loading && status === 'available' && (
+        <button style={{
+          height: 26, padding: '0 12px', borderRadius: 6,
+          background: '#0a84ff',
+          border: 'none', color: '#fff',
+          fontSize: 12, fontWeight: 600, fontFamily: MAC_FONT,
+          display: 'flex', alignItems: 'center', gap: 5,
+          cursor: 'pointer',
+        }} onClick={onLoad}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M5.5 1v7M2.5 5l3 3 3-3M1.5 9.5h8" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Download
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ModelLibrary({ onClose, view, onChangeView, downloadingId, downloadProgress, onStartDownload, onLoadCustom }) {
+  const [search, setSearch] = React.useState('');
+  const [customPath, setCustomPath] = React.useState('/Users/localuser/Models/custom-model.gguf');
+
+  const models = [
+    { id: 'llama31-8b', name: 'Llama 3.1 8B Instruct', params: '8.03B', quant: 'Q4_K_M', size: '4.92 GB', ctx: '128k', status: 'downloaded', active: true, color: '#bf5af2' },
+    { id: 'qwen25-7b', name: 'Qwen 2.5 7B Instruct', params: '7.62B', quant: 'Q5_K_M', size: '5.44 GB', ctx: '32k', status: 'downloaded', recommended: true, color: '#ff9f0a' },
+    { id: 'mistral-7b', name: 'Mistral 7B Instruct v0.3', params: '7.25B', quant: 'Q4_0', size: '4.11 GB', ctx: '32k', status: 'downloaded', color: '#0a84ff' },
+    { id: 'phi4-14b', name: 'Phi-4 14B', params: '14.7B', quant: 'Q4_K_M', size: '8.89 GB', ctx: '16k', status: 'available', color: '#30d158' },
+    { id: 'deepseek-r1-8b', name: 'DeepSeek R1 Distill 8B', params: '8.03B', quant: 'Q4_K_M', size: '4.92 GB', ctx: '32k', status: 'available', color: '#ff453a' },
+    { id: 'gemma3-9b', name: 'Gemma 3 9B Instruct', params: '9.24B', quant: 'Q5_K_M', size: '6.51 GB', ctx: '8k', status: 'available', color: '#64b5ff' },
+    { id: 'qwen25-14b', name: 'Qwen 2.5 14B Instruct', params: '14.8B', quant: 'Q4_K_M', size: '8.99 GB', ctx: '32k', status: 'available', color: '#ff6482' },
+  ];
+
+  const visible = view === 'installed'
+    ? models.filter((m) => m.status === 'downloaded')
+    : view === 'browse'
+    ? models
+    : [];
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'rgba(0,0,0,0.35)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 100,
+    }} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 720, height: 560,
+          background: 'rgba(38,38,40,0.95)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          borderRadius: 12,
+          border: '0.5px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+        {/* Header */}
+        <div style={{
+          height: 52, padding: '0 20px',
+          display: 'flex', alignItems: 'center', gap: 14,
+          borderBottom: '0.5px solid rgba(255,255,255,0.08)',
+        }}>
+          <div style={{
+            width: 24, height: 24, borderRadius: 6,
+            background: 'linear-gradient(135deg, #0a84ff, #bf5af2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="2" y="2" width="8" height="8" rx="1" stroke="#fff" strokeWidth="1.2" fill="none"/>
+              <rect x="4" y="4" width="4" height="4" fill="#fff"/>
+            </svg>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Models</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{
+            width: 22, height: 22, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.08)',
+            border: 'none', color: 'rgba(255,255,255,0.7)',
+            cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="9" height="9" viewBox="0 0 9 9"><path d="M1.5 1.5l6 6M7.5 1.5l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          display: 'flex', gap: 2, padding: '10px 16px 0',
+          borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+        }}>
+          {[
+            { id: 'installed', label: 'Installed', count: 3 },
+            { id: 'browse', label: 'Browse', count: 248 },
+            { id: 'custom', label: 'Load custom', icon: 'folder' },
+          ].map((tab) => (
+            <button key={tab.id}
+              onClick={() => onChangeView(tab.id)}
+              style={{
+                padding: '8px 14px', background: 'transparent',
+                border: 'none', borderBottom: view === tab.id ? '2px solid #0a84ff' : '2px solid transparent',
+                color: view === tab.id ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.55)',
+                fontSize: 12.5, fontWeight: 500, fontFamily: MAC_FONT,
+                cursor: 'pointer',
+                marginBottom: -0.5,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+              <span>{tab.label}</span>
+              {tab.count && (
+                <span style={{
+                  fontSize: 10, fontFamily: MAC_MONO,
+                  color: 'rgba(255,255,255,0.4)',
+                  padding: '0 5px', borderRadius: 8,
+                  background: 'rgba(255,255,255,0.06)',
+                }}>{tab.count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        {view !== 'custom' && (
+          <>
+            <div style={{
+              padding: '10px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                height: 28, borderRadius: 6,
+                background: 'rgba(0,0,0,0.25)',
+                border: '0.5px solid rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '0 10px',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="5" cy="5" r="3.5" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2"/>
+                  <path d="M8 8l2.5 2.5" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search Hugging Face, Ollama registry…"
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    color: 'rgba(255,255,255,0.9)', fontSize: 12, fontFamily: MAC_FONT,
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {['7B', 'GGUF', 'Instruct'].map((f) => (
+                    <span key={f} style={{
+                      fontSize: 10.5, padding: '2px 6px', borderRadius: 3,
+                      background: 'rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.7)', fontFamily: MAC_MONO,
+                    }}>{f}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {visible.map((m) => (
+                <ModelRow
+                  key={m.id}
+                  model={m}
+                  onLoad={() => onStartDownload(m.id)}
+                  loading={downloadingId === m.id}
+                  progress={downloadProgress}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {view === 'custom' && (
+          <div style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Load from local path</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                Point to a local GGUF, safetensors, or MLX model directory. LocalChat will mmap it into the active runtime.
+              </div>
+            </div>
+
+            <div style={{
+              border: '0.5px dashed rgba(255,255,255,0.2)',
+              borderRadius: 10, padding: 24,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+              background: 'rgba(255,255,255,0.02)',
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 10,
+                background: 'rgba(10,132,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <path d="M3 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" stroke="#64b5ff" strokeWidth="1.4" fill="none"/>
+                </svg>
+              </div>
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.85)' }}>Drag a model file here, or</div>
+              <button style={{
+                height: 28, padding: '0 16px', borderRadius: 6,
+                background: 'rgba(255,255,255,0.08)',
+                border: '0.5px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: 12, fontWeight: 500, fontFamily: MAC_FONT,
+                cursor: 'pointer',
+              }}>Choose file…</button>
+            </div>
+
+            <div>
+              <label style={{
+                fontSize: 11, fontWeight: 600,
+                color: 'rgba(255,255,255,0.6)',
+                letterSpacing: 0.3, textTransform: 'uppercase',
+                display: 'block', marginBottom: 6,
+              }}>Path</label>
+              <div style={{
+                height: 30, borderRadius: 6,
+                background: 'rgba(0,0,0,0.3)',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                display: 'flex', alignItems: 'center',
+                padding: '0 10px', gap: 8,
+              }}>
+                <input
+                  value={customPath}
+                  onChange={(e) => setCustomPath(e.target.value)}
+                  style={{
+                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                    color: 'rgba(255,255,255,0.95)',
+                    fontSize: 12, fontFamily: MAC_MONO,
+                  }}
+                />
+                <button style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none', color: 'rgba(255,255,255,0.8)',
+                  cursor: 'pointer', fontFamily: MAC_FONT,
+                }}>Browse…</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{
+                  fontSize: 11, fontWeight: 600,
+                  color: 'rgba(255,255,255,0.6)',
+                  letterSpacing: 0.3, textTransform: 'uppercase',
+                  display: 'block', marginBottom: 6,
+                }}>Runtime</label>
+                <select style={{
+                  width: '100%', height: 28, borderRadius: 6,
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: 12, fontFamily: MAC_FONT,
+                  padding: '0 8px',
+                }}>
+                  <option>llama.cpp (Metal)</option>
+                  <option>MLX</option>
+                  <option>ONNX Runtime</option>
+                </select>
+              </div>
+              <div>
+                <label style={{
+                  fontSize: 11, fontWeight: 600,
+                  color: 'rgba(255,255,255,0.6)',
+                  letterSpacing: 0.3, textTransform: 'uppercase',
+                  display: 'block', marginBottom: 6,
+                }}>GPU layers</label>
+                <input defaultValue="33" style={{
+                  width: '100%', height: 28, borderRadius: 6,
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '0.5px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: 12, fontFamily: MAC_MONO,
+                  padding: '0 8px',
+                  outline: 'none',
+                }} />
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: 'auto', paddingTop: 12,
+              display: 'flex', gap: 8, justifyContent: 'flex-end',
+            }}>
+              <button onClick={onClose} style={{
+                height: 28, padding: '0 14px', borderRadius: 6,
+                background: 'rgba(255,255,255,0.06)',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.9)',
+                fontSize: 12, fontWeight: 500, fontFamily: MAC_FONT,
+                cursor: 'pointer',
+              }}>Cancel</button>
+              <button onClick={onLoadCustom} style={{
+                height: 28, padding: '0 14px', borderRadius: 6,
+                background: '#0a84ff', border: 'none',
+                color: '#fff', fontSize: 12, fontWeight: 600, fontFamily: MAC_FONT,
+                cursor: 'pointer',
+              }}>Load model</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { ModelLibrary, ModelRow });
+
+
+// ===== states.jsx =====
+// Empty state + model-loading overlay + welcome states
+
+function EmptyState({ onPrompt, modelName }) {
+  const prompts = [
+    { title: 'Draft a Swift function', sub: 'to parse GGUF headers into a struct' },
+    { title: 'Explain memory-mapped I/O', sub: 'in the context of LLM inference' },
+    { title: 'Refactor this SwiftUI view', sub: 'into a reusable component' },
+    { title: 'Compare quantization methods', sub: 'Q4_K_M vs Q5_K_M vs Q8_0' },
+  ];
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '40px 24px',
+    }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: 14,
+        background: 'linear-gradient(135deg, rgba(10,132,255,0.2), rgba(191,90,242,0.2))',
+        border: '0.5px solid rgba(255,255,255,0.12)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        marginBottom: 20,
+      }}>
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <path d="M13 4l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" stroke="rgba(255,255,255,0.9)" strokeWidth="1.2" fill="none" strokeLinejoin="round"/>
+        </svg>
+      </div>
+      <h1 style={{
+        fontSize: 22, fontWeight: 600, margin: 0, marginBottom: 6,
+        color: 'rgba(255,255,255,0.95)',
+        letterSpacing: -0.2,
+      }}>What can I help you with?</h1>
+      <p style={{
+        fontSize: 13, color: 'rgba(255,255,255,0.55)',
+        margin: 0, marginBottom: 32, fontFamily: MAC_MONO,
+      }}>
+        Running {modelName} · local · private
+      </p>
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr',
+        gap: 8, maxWidth: 560, width: '100%',
+      }}>
+        {prompts.map((p, i) => (
+          <button key={i} onClick={() => onPrompt(p.title + ' ' + p.sub)}
+            style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)',
+              border: '0.5px solid rgba(255,255,255,0.08)',
+              textAlign: 'left', cursor: 'pointer',
+              fontFamily: MAC_FONT,
+              transition: 'background 0.12s, border-color 0.12s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+            }}>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.92)', marginBottom: 2 }}>
+              {p.title}
+            </div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+              {p.sub}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ModelLoadingOverlay({ modelName, progress, stage }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(20,20,22,0.4)',
+      backdropFilter: 'blur(10px)',
+      WebkitBackdropFilter: 'blur(10px)',
+      zIndex: 50,
+    }}>
+      <div style={{
+        width: 360, padding: 24,
+        background: 'rgba(44,44,46,0.95)',
+        border: '0.5px solid rgba(255,255,255,0.12)',
+        borderRadius: 12,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 7,
+            background: 'linear-gradient(135deg, #0a84ff, #bf5af2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative',
+          }}>
+            <div style={{
+              position: 'absolute', inset: -3, borderRadius: 10,
+              border: '1.5px solid rgba(10,132,255,0.4)',
+              animation: 'pulse 1.6s ease-out infinite',
+            }} />
+            <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="1.5" stroke="#fff" strokeWidth="1.3" fill="none"/><rect x="5" y="5" width="6" height="6" fill="#fff"/></svg>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{modelName}</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontFamily: MAC_MONO }}>
+              {stage}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          height: 5, borderRadius: 3,
+          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${progress}%`, height: '100%',
+            background: 'linear-gradient(90deg, #0a84ff, #64b5ff)',
+            transition: 'width 0.3s',
+            boxShadow: '0 0 8px rgba(10,132,255,0.5)',
+          }} />
+        </div>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          marginTop: 8, fontSize: 10.5, fontFamily: MAC_MONO,
+          color: 'rgba(255,255,255,0.5)',
+        }}>
+          <span>{progress}% · mmap 2.1 GB/s</span>
+          <span>{(((100 - progress) / 100) * 6).toFixed(1)}s remaining</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { EmptyState, ModelLoadingOverlay });
+
+
+// ===== app.jsx =====
+// Main LocalChat app composition + Tweaks
+
+const { useState, useEffect, useRef } = React;
+
+// EDITMODE defaults
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "density": "compact",
+  "layout": "document",
+  "state": "empty"
+}/*EDITMODE-END*/;
+
+// Predefined states shown via Tweaks (and in-app interactions)
+const STATES = {
+  empty: { label: 'Empty · new chat' },
+  streaming: { label: 'Active generation' },
+  loading: { label: 'Loading model' },
+  library: { label: 'Model library' },
+  custom: { label: 'Custom model path' },
+};
+
+const DEMO_USER = "I'm building a SwiftUI chat client for local LLMs. How should I structure the streaming token handler so the view updates smoothly without dropping frames at 60+ tok/s?";
+
+function StreamingContent({ progress }) {
+  // progress 0..1 — how much of the response has been generated
+  const text = (
+    <>
+      <p style={{ margin: '0 0 12px' }}>
+        For smooth streaming at high token rates, the key is{' '}
+        <strong style={{ color: 'rgba(255,255,255,1)' }}>decoupling</strong>{' '}
+        the generation loop from the view-update loop. Here's the pattern I'd use:
+      </p>
+      <ol style={{ margin: '0 0 12px', paddingLeft: 20 }}>
+        <li style={{ marginBottom: 4 }}>Buffer tokens in an actor</li>
+        <li style={{ marginBottom: 4 }}>Coalesce updates on a <code style={{ fontFamily: MAC_MONO, fontSize: 12, padding: '1px 5px', borderRadius: 3, background: 'rgba(255,255,255,0.08)' }}>CADisplayLink</code></li>
+        <li style={{ marginBottom: 4 }}>Push the concatenated delta to the main actor once per frame</li>
+      </ol>
+    </>
+  );
+
+  return (
+    <div>
+      {text}
+      <CodeBlock language="swift" code={
+`${c('kw','actor')} ${c('type','TokenBuffer')} {
+  ${c('kw','private var')} pending: [${c('type','String')}] = []
+
+  ${c('kw','func')} ${c('fn','append')}(_ token: ${c('type','String')}) {
+    pending.${c('fn','append')}(token)
+  }
+
+  ${c('kw','func')} ${c('fn','drain')}() -> ${c('type','String')} {
+    ${c('kw','let')} out = pending.${c('fn','joined')}()
+    pending.${c('fn','removeAll')}()
+    ${c('kw','return')} out
+  }
+}
+
+${c('kw','@MainActor')}
+${c('kw','final class')} ${c('type','StreamingViewModel')}: ${c('type','ObservableObject')} {
+  ${c('kw','@Published var')} text: ${c('type','String')} = ${c('str','""')}
+  ${c('kw','private let')} buffer = ${c('type','TokenBuffer')}()
+  ${c('kw','private var')} displayLink: ${c('type','CADisplayLink')}?
+
+  ${c('kw','func')} ${c('fn','start')}() {
+    displayLink = ${c('type','CADisplayLink')}(target: ${c('kw','self')}, selector: ${c('str','#selector(tick)')})
+    displayLink?.${c('fn','add')}(to: .main, forMode: .common)
+  }
+
+  ${c('kw','@objc func')} ${c('fn','tick')}() {
+    ${c('type','Task')} {
+      ${c('kw','let')} delta = ${c('kw','await')} buffer.${c('fn','drain')}()
+      ${c('kw','if')} !delta.${c('prop','isEmpty')} { text += delta }
+    }
+  }
+}`
+      } />
+      {progress > 0.7 && (
+        <>
+          <p style={{ margin: '12px 0 8px' }}>
+            A few tips that make a real difference at {Math.floor(60 + progress * 40)} tok/s on Apple Silicon:
+          </p>
+          <ul style={{ margin: '0 0 0', paddingLeft: 20 }}>
+            <li style={{ marginBottom: 4 }}>Keep <code style={{ fontFamily: MAC_MONO, fontSize: 12 }}>Text</code> inside a <code style={{ fontFamily: MAC_MONO, fontSize: 12 }}>LazyVStack</code> so SwiftUI can diff efficiently</li>
+            <li style={{ marginBottom: 4 }}>Avoid <code style={{ fontFamily: MAC_MONO, fontSize: 12 }}>AttributedString</code> mid-stream; render plain, format on stop</li>
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [density, setDensity] = useState(TWEAK_DEFAULTS.density);
+  const [layout, setLayout] = useState(TWEAK_DEFAULTS.layout);
+  const [state, setState] = useState(TWEAK_DEFAULTS.state);
+
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [selectedConv, setSelectedConv] = useState('t1');
+  const [libraryView, setLibraryView] = useState('installed');
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Simulated live telemetry
+  const [tokPerSec, setTokPerSec] = useState(72.4);
+  const [sparkData, setSparkData] = useState(() => Array.from({ length: 30 }, (_, i) => 50 + Math.sin(i / 3) * 12 + Math.random() * 8));
+  const [loadingProgress, setLoadingProgress] = useState(42);
+  const [streamProgress, setStreamProgress] = useState(0.5);
+
+  // Live update metrics during streaming
+  useEffect(() => {
+    if (state !== 'streaming') return;
+    const interval = setInterval(() => {
+      setTokPerSec((prev) => Math.max(40, Math.min(95, prev + (Math.random() - 0.5) * 6)));
+      setSparkData((prev) => [...prev.slice(1), 60 + Math.random() * 25]);
+      setStreamProgress((p) => Math.min(1, p + 0.01));
+    }, 280);
+    return () => clearInterval(interval);
+  }, [state]);
+
+  useEffect(() => {
+    if (state !== 'loading') return;
+    const interval = setInterval(() => {
+      setLoadingProgress((p) => p >= 98 ? 42 : p + 2);
+    }, 180);
+    return () => clearInterval(interval);
+  }, [state]);
+
+  useEffect(() => {
+    if (!downloadingId) return;
+    const interval = setInterval(() => {
+      setDownloadProgress((p) => {
+        if (p >= 100) { setDownloadingId(null); return 0; }
+        return p + 1;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [downloadingId]);
+
+  // Tweaks / edit mode host protocol
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (e) {}
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const persistTweak = (edits) => {
+    try {
+      window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+    } catch (e) {}
+  };
+
+  const currentModel = { name: 'Llama 3.1 8B Instruct', quant: 'Q4_K_M', size: '4.92 GB' };
+  const modelStatus = state === 'loading' ? 'loading' : 'ready';
+  const streaming = state === 'streaming';
+  const isGenerating = streaming;
+
+  const conversationTitle = {
+    empty: 'New chat',
+    streaming: 'SwiftUI streaming token handler',
+    loading: 'SwiftUI streaming token handler',
+    library: 'SwiftUI streaming token handler',
+    custom: 'SwiftUI streaming token handler',
+  }[state];
+
+  return (
+    <div style={{
+      width: '100vw', height: '100vh',
+      background: 'radial-gradient(ellipse at top left, #2a2d3a 0%, #141416 50%, #0c0c0e 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 20, boxSizing: 'border-box',
+      fontFamily: MAC_FONT,
+    }}>
+      <MacWindow width={Math.min(1360, window.innerWidth - 40)} height={Math.min(860, window.innerHeight - 40)}>
+        {!sidebarCollapsed && (
+          <Sidebar
+            selectedId={selectedConv}
+            onSelect={setSelectedConv}
+            onNewChat={() => setState('empty')}
+            density={density}
+            onToggle={() => setSidebarCollapsed(true)}
+          />
+        )}
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: '#1c1c1e', position: 'relative' }}>
+          <Toolbar
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed(false)}
+            inspectorOpen={false}
+            onToggleInspector={() => {}}
+            currentModel={currentModel}
+            modelStatus={modelStatus}
+            onOpenModelLibrary={() => { setLibraryView('installed'); setState('library'); }}
+            conversationTitle={conversationTitle}
+          />
+
+          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
+              {state === 'empty' ? (
+                <EmptyState modelName={currentModel.name} onPrompt={() => setState('streaming')} />
+              ) : (
+                <div style={{
+                  flex: 1, overflowY: 'auto',
+                  padding: density === 'compact' ? '8px 20px' : '16px 28px',
+                }}>
+                  <div style={{ maxWidth: 760, margin: '0 auto' }}>
+                    <UserMessage content={DEMO_USER} layout={layout} />
+                    <AssistantMessage
+                      modelName={currentModel.name}
+                      streaming={streaming}
+                      layout={layout}
+                      showActions={!streaming}
+                      metrics={{ ttft: 218, tokPerSec: streaming ? tokPerSec.toFixed(1) : '71.3', promptTokens: 247, responseTokens: 412 }}
+                    >
+                      <StreamingContent progress={streaming ? streamProgress : 1} />
+                    </AssistantMessage>
+                  </div>
+                </div>
+              )}
+
+              <Composer
+                isGenerating={isGenerating}
+                onSend={() => setState('streaming')}
+                onStop={() => setState('empty')}
+                density={density}
+              />
+
+              {state === 'loading' && (
+                <ModelLoadingOverlay
+                  modelName="Qwen 2.5 7B Instruct"
+                  progress={loadingProgress}
+                  stage={loadingProgress < 40 ? 'Reading metadata…' : loadingProgress < 75 ? 'Allocating Metal buffers…' : 'Offloading 33 layers to GPU…'}
+                />
+              )}
+            </div>
+
+
+          </div>
+
+          {(state === 'library' || state === 'custom') && (
+            <ModelLibrary
+              onClose={() => setState('empty')}
+              view={state === 'custom' ? 'custom' : libraryView}
+              onChangeView={(v) => {
+                if (v === 'custom') setState('custom');
+                else { setLibraryView(v); setState('library'); }
+              }}
+              downloadingId={downloadingId}
+              downloadProgress={downloadProgress}
+              onStartDownload={(id) => { setDownloadingId(id); setDownloadProgress(0); }}
+              onLoadCustom={() => { setState('loading'); setLoadingProgress(10); }}
+            />
+          )}
+        </div>
+      </MacWindow>
+
+      {tweaksOpen && (
+        <TweaksPanel
+          density={density} setDensity={(v) => { setDensity(v); persistTweak({ density: v }); }}
+          layout={layout} setLayout={(v) => { setLayout(v); persistTweak({ layout: v }); }}
+          state={state} setState={(v) => { setState(v); persistTweak({ state: v }); }}
+          onClose={() => setTweaksOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function TweaksPanel({ density, setDensity, layout, setLayout, state, setState, onClose }) {
+  const Group = ({ label, options, value, onChange }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{
+        fontSize: 10.5, fontWeight: 600,
+        color: 'rgba(255,255,255,0.55)',
+        letterSpacing: 0.3, textTransform: 'uppercase',
+        marginBottom: 6,
+      }}>{label}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {options.map((opt) => (
+          <button key={opt.id} onClick={() => onChange(opt.id)} style={{
+            padding: '7px 10px', borderRadius: 6,
+            background: value === opt.id ? 'rgba(10,132,255,0.2)' : 'rgba(255,255,255,0.04)',
+            border: value === opt.id ? '0.5px solid rgba(10,132,255,0.5)' : '0.5px solid rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.95)',
+            fontSize: 12, fontFamily: MAC_FONT, fontWeight: 500,
+            textAlign: 'left', cursor: 'pointer',
+          }}>{opt.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{
+      position: 'fixed', right: 20, bottom: 20,
+      width: 260, padding: 16,
+      background: 'rgba(38,38,40,0.95)',
+      backdropFilter: 'blur(40px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+      border: '0.5px solid rgba(255,255,255,0.12)',
+      borderRadius: 12,
+      boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+      fontFamily: MAC_FONT,
+      color: 'rgba(255,255,255,0.95)',
+      zIndex: 1000,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Tweaks</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={onClose} style={{
+          width: 20, height: 20, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.08)', border: 'none',
+          color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="8" height="8" viewBox="0 0 9 9"><path d="M1.5 1.5l6 6M7.5 1.5l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+        </button>
+      </div>
+
+      <Group label="State" value={state} onChange={setState}
+        options={[
+          { id: 'empty', label: 'Empty · new chat' },
+          { id: 'streaming', label: 'Active generation' },
+          { id: 'loading', label: 'Loading model' },
+          { id: 'library', label: 'Model library' },
+          { id: 'custom', label: 'Custom model path' },
+        ]} />
+
+      <Group label="Density" value={density} onChange={setDensity}
+        options={[
+          { id: 'comfortable', label: 'Comfortable' },
+          { id: 'compact', label: 'Compact' },
+        ]} />
+
+      <Group label="Chat layout" value={layout} onChange={setLayout}
+        options={[
+          { id: 'document', label: 'Document (Claude-like)' },
+          { id: 'chat-bubble', label: 'Chat bubbles (iMessage-like)' },
+        ]} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+
+</script>
+</body>
+</html>

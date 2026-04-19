@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		550363FA3FBE46E0A06A4907 /* LocalChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = 66C4B0102F95641600A6B35B /* LocalChatKit */; };
 		66C4B0112F95641600A6B35B /* LocalChatKit in Frameworks */ = {isa = PBXBuildFile; productRef = 66C4B0102F95641600A6B35B /* LocalChatKit */; };
 		66E930AA2F95153A00E9CBD9 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930A92F95153A00E9CBD9 /* MLXLLM */; };
 		66E930AC2F95153A00E9CBD9 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930AB2F95153A00E9CBD9 /* MLXLMCommon */; };
@@ -96,6 +97,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				550363FA3FBE46E0A06A4907 /* LocalChatKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +198,7 @@
 			);
 			name = LocalChat;
 			packageProductDependencies = (
+				66C4B0102F95641600A6B35B /* LocalChatKit */,
 			);
 			productName = LocalChat;
 			productReference = 66E930BE2F95367900E9CBD9 /* LocalChat.app */;

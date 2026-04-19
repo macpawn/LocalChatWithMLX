@@ -1,10 +1,3 @@
-//
-//  LocalChatApp.swift
-//  LocalChat
-//
-//  Created by Dmytro on 19.04.2026.
-//
-
 import SwiftUI
 
 @main
@@ -13,5 +6,8 @@ struct LocalChatApp: App {
         WindowGroup {
             ContentView()
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1100, height: 720)
     }
 }
