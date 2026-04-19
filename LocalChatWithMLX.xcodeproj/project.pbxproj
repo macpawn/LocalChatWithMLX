@@ -16,6 +16,23 @@
 		66E930B92F951F2200E9CBD9 /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 66E930B82F951F2200E9CBD9 /* Transformers */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		66E930CB2F95367B00E9CBD9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 66E930962F9514E000E9CBD9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 66E930BD2F95367900E9CBD9;
+			remoteInfo = LocalChat;
+		};
+		66E930D52F95367B00E9CBD9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 66E930962F9514E000E9CBD9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 66E930BD2F95367900E9CBD9;
+			remoteInfo = LocalChat;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		66E9309C2F9514E000E9CBD9 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -30,12 +47,30 @@
 
 /* Begin PBXFileReference section */
 		66E9309E2F9514E000E9CBD9 /* LocalChatWithMLX */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LocalChatWithMLX; sourceTree = BUILT_PRODUCTS_DIR; };
+		66E930BE2F95367900E9CBD9 /* LocalChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocalChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		66E930CA2F95367B00E9CBD9 /* LocalChatTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LocalChatTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		66E930D42F95367B00E9CBD9 /* LocalChatUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LocalChatUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		66E930A02F9514E000E9CBD9 /* LocalChatWithMLX */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LocalChatWithMLX;
+			sourceTree = "<group>";
+		};
+		66E930BF2F95367900E9CBD9 /* LocalChat */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LocalChat;
+			sourceTree = "<group>";
+		};
+		66E930CD2F95367B00E9CBD9 /* LocalChatTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LocalChatTests;
+			sourceTree = "<group>";
+		};
+		66E930D72F95367B00E9CBD9 /* LocalChatUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LocalChatUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -55,6 +90,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		66E930BB2F95367900E9CBD9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930C72F95367B00E9CBD9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930D12F95367B00E9CBD9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,6 +118,9 @@
 			isa = PBXGroup;
 			children = (
 				66E930A02F9514E000E9CBD9 /* LocalChatWithMLX */,
+				66E930BF2F95367900E9CBD9 /* LocalChat */,
+				66E930CD2F95367B00E9CBD9 /* LocalChatTests */,
+				66E930D72F95367B00E9CBD9 /* LocalChatUITests */,
 				66E930AD2F95177900E9CBD9 /* Frameworks */,
 				66E9309F2F9514E000E9CBD9 /* Products */,
 			);
@@ -71,6 +130,9 @@
 			isa = PBXGroup;
 			children = (
 				66E9309E2F9514E000E9CBD9 /* LocalChatWithMLX */,
+				66E930BE2F95367900E9CBD9 /* LocalChat.app */,
+				66E930CA2F95367B00E9CBD9 /* LocalChatTests.xctest */,
+				66E930D42F95367B00E9CBD9 /* LocalChatUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,6 +176,74 @@
 			productReference = 66E9309E2F9514E000E9CBD9 /* LocalChatWithMLX */;
 			productType = "com.apple.product-type.tool";
 		};
+		66E930BD2F95367900E9CBD9 /* LocalChat */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 66E930E22F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChat" */;
+			buildPhases = (
+				66E930BA2F95367900E9CBD9 /* Sources */,
+				66E930BB2F95367900E9CBD9 /* Frameworks */,
+				66E930BC2F95367900E9CBD9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				66E930BF2F95367900E9CBD9 /* LocalChat */,
+			);
+			name = LocalChat;
+			packageProductDependencies = (
+			);
+			productName = LocalChat;
+			productReference = 66E930BE2F95367900E9CBD9 /* LocalChat.app */;
+			productType = "com.apple.product-type.application";
+		};
+		66E930C92F95367B00E9CBD9 /* LocalChatTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 66E930E32F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChatTests" */;
+			buildPhases = (
+				66E930C62F95367B00E9CBD9 /* Sources */,
+				66E930C72F95367B00E9CBD9 /* Frameworks */,
+				66E930C82F95367B00E9CBD9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				66E930CC2F95367B00E9CBD9 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				66E930CD2F95367B00E9CBD9 /* LocalChatTests */,
+			);
+			name = LocalChatTests;
+			packageProductDependencies = (
+			);
+			productName = LocalChatTests;
+			productReference = 66E930CA2F95367B00E9CBD9 /* LocalChatTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		66E930D32F95367B00E9CBD9 /* LocalChatUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 66E930E42F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChatUITests" */;
+			buildPhases = (
+				66E930D02F95367B00E9CBD9 /* Sources */,
+				66E930D12F95367B00E9CBD9 /* Frameworks */,
+				66E930D22F95367B00E9CBD9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				66E930D62F95367B00E9CBD9 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				66E930D72F95367B00E9CBD9 /* LocalChatUITests */,
+			);
+			name = LocalChatUITests;
+			packageProductDependencies = (
+			);
+			productName = LocalChatUITests;
+			productReference = 66E930D42F95367B00E9CBD9 /* LocalChatUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -126,6 +256,17 @@
 				TargetAttributes = {
 					66E9309D2F9514E000E9CBD9 = {
 						CreatedOnToolsVersion = 26.4;
+					};
+					66E930BD2F95367900E9CBD9 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					66E930C92F95367B00E9CBD9 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 66E930BD2F95367900E9CBD9;
+					};
+					66E930D32F95367B00E9CBD9 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = 66E930BD2F95367900E9CBD9;
 					};
 				};
 			};
@@ -149,9 +290,36 @@
 			projectRoot = "";
 			targets = (
 				66E9309D2F9514E000E9CBD9 /* LocalChatWithMLX */,
+				66E930BD2F95367900E9CBD9 /* LocalChat */,
+				66E930C92F95367B00E9CBD9 /* LocalChatTests */,
+				66E930D32F95367B00E9CBD9 /* LocalChatUITests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		66E930BC2F95367900E9CBD9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930C82F95367B00E9CBD9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930D22F95367B00E9CBD9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		66E9309A2F9514E000E9CBD9 /* Sources */ = {
@@ -161,7 +329,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		66E930BA2F95367900E9CBD9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930C62F95367B00E9CBD9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		66E930D02F95367B00E9CBD9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		66E930CC2F95367B00E9CBD9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 66E930BD2F95367900E9CBD9 /* LocalChat */;
+			targetProxy = 66E930CB2F95367B00E9CBD9 /* PBXContainerItemProxy */;
+		};
+		66E930D62F95367B00E9CBD9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 66E930BD2F95367900E9CBD9 /* LocalChat */;
+			targetProxy = 66E930D52F95367B00E9CBD9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		66E930A32F9514E000E9CBD9 /* Debug */ = {
@@ -304,6 +506,142 @@
 			};
 			name = Release;
 		};
+		66E930DC2F95367C00E9CBD9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChat;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		66E930DD2F95367C00E9CBD9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChat;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		66E930DE2F95367C00E9CBD9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LocalChat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LocalChat";
+			};
+			name = Debug;
+		};
+		66E930DF2F95367C00E9CBD9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChatTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LocalChat.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/LocalChat";
+			};
+			name = Release;
+		};
+		66E930E02F95367C00E9CBD9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChatUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = LocalChat;
+			};
+			name = Debug;
+		};
+		66E930E12F95367C00E9CBD9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dmytro.LocalChatUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = LocalChat;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -321,6 +659,33 @@
 			buildConfigurations = (
 				66E930A62F9514E000E9CBD9 /* Debug */,
 				66E930A72F9514E000E9CBD9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		66E930E22F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChat" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				66E930DC2F95367C00E9CBD9 /* Debug */,
+				66E930DD2F95367C00E9CBD9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		66E930E32F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChatTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				66E930DE2F95367C00E9CBD9 /* Debug */,
+				66E930DF2F95367C00E9CBD9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		66E930E42F95368900E9CBD9 /* Build configuration list for PBXNativeTarget "LocalChatUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				66E930E02F95367C00E9CBD9 /* Debug */,
+				66E930E12F95367C00E9CBD9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
