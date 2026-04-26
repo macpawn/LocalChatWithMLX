@@ -6,7 +6,7 @@ import Tokenizers
 
 private let modelFilePatterns = ["*.safetensors", "*.json", "*.jinja"]
 
-public actor ModelManager {
+public actor ModelManager: ModelManagerProtocol {
     private let storage: ModelStorageConfig
 
     public init(storage: ModelStorageConfig = .default) {
@@ -90,27 +90,39 @@ public actor ModelManager {
         }
     }
 
-    /// Loads the model into memory for inference.
+    /// Streams load progress. Final event is `.ready(LoadedModel)`.
     /// Throws `LocalChatError.modelNotDownloaded` if files are not on disk.
-    public func load(_ model: Model) async throws -> LoadedModel {
-        guard isDownloaded(model) else {
-            throw LocalChatError.modelNotDownloaded(model)
-        }
-        do {
-            let client = HubClient(cache: HubCache(cacheDirectory: storage.baseDirectory))
-            let downloader = #hubDownloader(client)
-            let container = try await loadModelContainer(
-                from: downloader,
-                using: #huggingFaceTokenizerLoader(),
-                configuration: model.llmConfiguration,
-                useLatest: false,
-                progressHandler: { _ in }
-            )
-            return LoadedModel(model: model, container: container)
-        } catch let error as LocalChatError {
-            throw error
-        } catch {
-            throw LocalChatError.loadFailed(underlying: error)
+    public func load(_ model: Model) -> AsyncThrowingStream<LoadProgress, Error> {
+        let storage = self.storage
+        let isReady = isDownloaded(model)
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                guard isReady else {
+                    continuation.finish(throwing: LocalChatError.modelNotDownloaded(model))
+                    return
+                }
+                do {
+                    let client = HubClient(cache: HubCache(cacheDirectory: storage.baseDirectory))
+                    let downloader = #hubDownloader(client)
+                    let container = try await loadModelContainer(
+                        from: downloader,
+                        using: #huggingFaceTokenizerLoader(),
+                        configuration: model.llmConfiguration,
+                        useLatest: false,
+                        progressHandler: { progress in
+                            let fraction = max(0.0, min(1.0, progress.fractionCompleted))
+                            continuation.yield(.loading(fraction: fraction))
+                        }
+                    )
+                    continuation.yield(.ready(LoadedModel(model: model, container: container)))
+                    continuation.finish()
+                } catch let error as LocalChatError {
+                    continuation.finish(throwing: error)
+                } catch {
+                    continuation.finish(throwing: LocalChatError.loadFailed(underlying: error))
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 }

@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "LocalChatKit", targets: ["LocalChatKit"]),
+        .library(name: "LocalChatKitMocks", targets: ["LocalChatKitMocks"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.3")),
@@ -23,9 +24,13 @@ let package = Package(
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ]
         ),
+        .target(
+            name: "LocalChatKitMocks",
+            dependencies: ["LocalChatKit"]
+        ),
         .testTarget(
             name: "LocalChatKitTests",
-            dependencies: ["LocalChatKit"]
+            dependencies: ["LocalChatKit", "LocalChatKitMocks"]
         ),
     ]
 )
