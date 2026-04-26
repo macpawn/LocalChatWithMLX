@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
 
     var body: some View {
         VStack(spacing: 0) {

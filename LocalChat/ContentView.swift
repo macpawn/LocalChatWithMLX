@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var vm = ChatViewModel()
+    @State private var vm = ChatViewModel()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -25,7 +25,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .frame(minWidth: 720, minHeight: 500)
         .animation(.spring(response: 0.28, dampingFraction: 0.85), value: vm.sidebarVisible)
-        .sheet(isPresented: $vm.showModelLibrary) {
+        .sheet(isPresented: Bindable(vm).showModelLibrary) {
             ModelLibraryView(vm: vm)
                 .onAppear { vm.refreshDownloadedModels() }
         }

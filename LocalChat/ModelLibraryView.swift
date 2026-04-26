@@ -2,7 +2,7 @@ import SwiftUI
 import LocalChatKit
 
 struct ModelLibraryView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var search: String = ""
     @State private var customPath: String = ""
@@ -283,7 +283,7 @@ struct ModelLibraryView: View {
 
 struct ModelRowView: View {
     let model: ModelLibraryView.ModelMeta
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
     let onDismiss: () -> Void
     @State private var isHovered = false
 

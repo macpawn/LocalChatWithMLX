@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ComposerView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
     @State private var inputText: String = ""
     @State private var isFocused: Bool = false
     @FocusState private var focused: Bool

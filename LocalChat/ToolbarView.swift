@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ToolbarView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
 
     var body: some View {
         HStack(spacing: 6) {
@@ -68,7 +68,7 @@ struct ToolbarView: View {
 // MARK: - Model Pill
 
 struct ModelPillView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
     @State private var isHovered = false
 
     var body: some View {

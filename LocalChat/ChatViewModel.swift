@@ -1,9 +1,9 @@
 import SwiftUI
 import LocalChatKit
-import Combine
 
 @MainActor
-final class ChatViewModel: ObservableObject {
+@Observable
+final class ChatViewModel {
 
     // MARK: - Dependencies
 
@@ -11,25 +11,25 @@ final class ChatViewModel: ObservableObject {
 
     // MARK: - Model state
 
-    @Published var selectedModel: LocalChatKit.Model
-    @Published var modelStatus: ModelStatus = .unloaded
+    var selectedModel: LocalChatKit.Model
+    var modelStatus: ModelStatus = .unloaded
 
     // MARK: - Conversations
 
-    @Published var conversations: [Conversation] = []
-    @Published var selectedConversationId: UUID?
+    var conversations: [Conversation] = []
+    var selectedConversationId: UUID?
 
     // MARK: - Current chat
 
-    @Published var messages: [ChatMessage] = []
-    @Published var isGenerating: Bool = false
+    var messages: [ChatMessage] = []
+    var isGenerating: Bool = false
 
     // MARK: - UI state
 
-    @Published var sidebarVisible: Bool = true
-    @Published var showModelLibrary: Bool = false
-    @Published var libraryTab: LibraryTab = .installed
-    @Published var downloadedModels: Set<LocalChatKit.Model> = []
+    var sidebarVisible: Bool = true
+    var showModelLibrary: Bool = false
+    var libraryTab: LibraryTab = .installed
+    var downloadedModels: Set<LocalChatKit.Model> = []
 
     enum LibraryTab: Equatable { case installed, browse, custom }
 

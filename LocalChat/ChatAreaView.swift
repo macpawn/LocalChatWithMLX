@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChatAreaView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
     @Namespace private var bottomID
 
     var body: some View {
@@ -58,7 +58,7 @@ struct ChatAreaView: View {
 // MARK: - Empty state
 
 struct EmptyStateView: View {
-    @ObservedObject var vm: ChatViewModel
+    var vm: ChatViewModel
 
     private let suggestions = [
         ("Draft a Swift function", "to parse GGUF headers into a struct"),
