@@ -60,7 +60,7 @@ public actor ChatSession: ChatSessionProtocol {
                         self._history.append(ChatMessage(role: .assistant, content: fullResponse))
                         continuation.finish()
                     } catch is CancellationError {
-                        // onCancel already finished the continuation; nothing to do here.
+                        continuation.finish(throwing: CancellationError())
                     } catch {
                         continuation.finish(
                             throwing: LocalChatError.generationFailed(underlying: error)

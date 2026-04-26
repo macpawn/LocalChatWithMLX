@@ -20,7 +20,7 @@ if await !manager.isDownloaded(.gemma4_e2b) {
 
 // Load model
 print("Loading model into memory...")
-let model = try await manager.load(.gemma4_e2b)
+let model = try await manager.loadModel(.gemma4_e2b)
 print("Model ready.\n")
 
 // Stateful session

@@ -50,7 +50,7 @@ final class ChatViewModel: ObservableObject {
 
     func loadSelectedModel() {
         guard case .unloaded = modelStatus else { return }
-        Task {
+        Task { @MainActor in
             do {
                 let isOnDisk = await manager.isDownloaded(selectedModel)
                 if !isOnDisk {
@@ -73,7 +73,7 @@ final class ChatViewModel: ObservableObject {
     }
 
     func refreshDownloadedModels() {
-        Task {
+        Task { @MainActor in
             var result: Set<LocalChatKit.Model> = []
             for model in LocalChatKit.Model.allCases {
                 if await manager.isDownloaded(model) { result.insert(model) }
@@ -114,7 +114,7 @@ final class ChatViewModel: ObservableObject {
         messageStore[convId] = messages
         isGenerating = true
 
-        generationTask = Task { [weak self] in
+        generationTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
                 for try await event in await session.sendStreaming(trimmed) {
