@@ -27,6 +27,7 @@ struct ContentView: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.85), value: vm.sidebarVisible)
         .sheet(isPresented: $vm.showModelLibrary) {
             ModelLibraryView(vm: vm)
+                .onAppear { vm.refreshDownloadedModels() }
         }
         .onAppear {
             // Auto-load on first launch

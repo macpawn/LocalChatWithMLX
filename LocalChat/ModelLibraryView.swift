@@ -269,12 +269,12 @@ struct ModelLibraryView: View {
     }
 
     private var allModels: [ModelMeta] {
-        let downloaded = vm.modelStatus == .ready
+        let isActive = vm.modelStatus == .ready
         return [
-            ModelMeta(id: .gemma4_e2b,  name: "Gemma 4 E2B Instruct",   params: "2B",  quant: "Q4",   size: "~2 GB",   ctx: "8k",   isDownloaded: downloaded && vm.selectedModel == .gemma4_e2b, isActive: vm.selectedModel == .gemma4_e2b, isRecommended: false),
-            ModelMeta(id: .gemma4_e4b,  name: "Gemma 4 E4B Instruct",   params: "4B",  quant: "Q4",   size: "~4 GB",   ctx: "8k",   isDownloaded: false, isActive: false, isRecommended: true),
-            ModelMeta(id: .llama3_2_1B, name: "Llama 3.2 1B Instruct",  params: "1B",  quant: "4bit", size: "~0.7 GB", ctx: "128k", isDownloaded: false, isActive: false, isRecommended: false),
-            ModelMeta(id: .llama3_2_3B, name: "Llama 3.2 3B Instruct",  params: "3B",  quant: "4bit", size: "~2 GB",   ctx: "128k", isDownloaded: false, isActive: false, isRecommended: false),
+            ModelMeta(id: .gemma4_e2b,  name: "Gemma 4 E2B Instruct",   params: "2B",  quant: "Q4",   size: "~2 GB",   ctx: "8k",   isDownloaded: vm.downloadedModels.contains(.gemma4_e2b),  isActive: isActive && vm.selectedModel == .gemma4_e2b,  isRecommended: false),
+            ModelMeta(id: .gemma4_e4b,  name: "Gemma 4 E4B Instruct",   params: "4B",  quant: "Q4",   size: "~4 GB",   ctx: "8k",   isDownloaded: vm.downloadedModels.contains(.gemma4_e4b),  isActive: isActive && vm.selectedModel == .gemma4_e4b,  isRecommended: true),
+            ModelMeta(id: .llama3_2_1B, name: "Llama 3.2 1B Instruct",  params: "1B",  quant: "4bit", size: "~0.7 GB", ctx: "128k", isDownloaded: vm.downloadedModels.contains(.llama3_2_1B), isActive: isActive && vm.selectedModel == .llama3_2_1B, isRecommended: false),
+            ModelMeta(id: .llama3_2_3B, name: "Llama 3.2 3B Instruct",  params: "3B",  quant: "4bit", size: "~2 GB",   ctx: "128k", isDownloaded: vm.downloadedModels.contains(.llama3_2_3B), isActive: isActive && vm.selectedModel == .llama3_2_3B, isRecommended: false),
         ]
     }
 }

@@ -5,9 +5,13 @@ import Combine
 @MainActor
 final class ChatViewModel: ObservableObject {
 
+    // MARK: - Dependencies
+
+    private var settings: AppSettingsProtocol
+
     // MARK: - Model state
 
-    @Published var selectedModel: LocalChatKit.Model = .gemma4_e2b
+    @Published var selectedModel: LocalChatKit.Model
     @Published var modelStatus: ModelStatus = .unloaded
 
     // MARK: - Conversations
@@ -25,6 +29,7 @@ final class ChatViewModel: ObservableObject {
     @Published var sidebarVisible: Bool = true
     @Published var showModelLibrary: Bool = false
     @Published var libraryTab: LibraryTab = .installed
+    @Published var downloadedModels: Set<LocalChatKit.Model> = []
 
     enum LibraryTab: Equatable { case installed, browse, custom }
 
@@ -34,6 +39,11 @@ final class ChatViewModel: ObservableObject {
     private var loadedModel: LoadedModel?
     private var session: ChatSession?
     private var generationTask: Task<Void, Never>?
+
+    init(settings: AppSettingsProtocol = AppSettings.shared) {
+        self.settings = settings
+        self.selectedModel = settings.lastSelectedModel
+    }
 
     // MARK: - Model management
 
@@ -51,13 +61,23 @@ final class ChatViewModel: ObservableObject {
                     }
                 }
                 modelStatus = .loading
-                let model = try await manager.load(selectedModel)
+                let model = try await manager.loadModel(selectedModel)
                 loadedModel = model
                 session = ChatSession(model: model, systemPrompt: "You are a helpful assistant.")
                 modelStatus = .ready
             } catch {
                 modelStatus = .error(error.localizedDescription)
             }
+        }
+    }
+
+    func refreshDownloadedModels() {
+        Task {
+            var result: Set<LocalChatKit.Model> = []
+            for model in LocalChatKit.Model.allCases {
+                if await manager.isDownloaded(model) { result.insert(model) }
+            }
+            downloadedModels = result
         }
     }
 
@@ -70,6 +90,7 @@ final class ChatViewModel: ObservableObject {
         session = nil
         selectedModel = model
         modelStatus = .unloaded
+        settings.lastSelectedModel = model
     }
 
     // MARK: - Chat
