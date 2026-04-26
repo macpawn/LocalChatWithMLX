@@ -39,6 +39,7 @@ final class ChatViewModel: ObservableObject {
     private var loadedModel: LoadedModel?
     private var session: ChatSession?
     private var generationTask: Task<Void, Never>?
+    private var messageStore: [UUID: [ChatMessage]] = [:]
 
     init(settings: AppSettingsProtocol = AppSettings.shared) {
         self.settings = settings
@@ -105,9 +106,12 @@ final class ChatViewModel: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        messages.append(.user(trimmed))
+        let convId = selectedConversationId!
         let assistantId = UUID()
+
+        messages.append(.user(trimmed))
         messages.append(ChatMessage(id: assistantId, role: .assistant, content: "", metrics: nil, isStreaming: true))
+        messageStore[convId] = messages
         isGenerating = true
 
         generationTask = Task { [weak self] in
@@ -117,26 +121,39 @@ final class ChatViewModel: ObservableObject {
                     guard !Task.isCancelled else { break }
                     switch event {
                     case .token(let token):
-                        if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                            messages[idx].content += token
+                        guard let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) else { continue }
+                        messageStore[convId]![idx].content += token
+                        if selectedConversationId == convId,
+                           let visibleIdx = messages.firstIndex(where: { $0.id == assistantId }) {
+                            messages[visibleIdx].content += token
                         }
                     case .completed(let stats):
-                        if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                            messages[idx].isStreaming = false
-                            messages[idx].metrics = MessageMetrics(
-                                ttft: stats.timeToFirstToken,
-                                tokPerSec: stats.tokensPerSecond,
-                                promptTokens: stats.promptTokenCount,
-                                responseTokens: stats.generatedTokenCount
-                            )
+                        let metrics = MessageMetrics(
+                            ttft: stats.timeToFirstToken,
+                            tokPerSec: stats.tokensPerSecond,
+                            promptTokens: stats.promptTokenCount,
+                            responseTokens: stats.generatedTokenCount
+                        )
+                        if let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) {
+                            messageStore[convId]![idx].isStreaming = false
+                            messageStore[convId]![idx].metrics = metrics
+                        }
+                        if selectedConversationId == convId,
+                           let visibleIdx = messages.firstIndex(where: { $0.id == assistantId }) {
+                            messages[visibleIdx].isStreaming = false
+                            messages[visibleIdx].metrics = metrics
                         }
                         isGenerating = false
-                        updateConversationMeta(firstMessage: trimmed)
+                        updateConversationMeta(firstMessage: trimmed, conversationId: convId)
                     }
                 }
             } catch {
-                if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                    messages[idx].isStreaming = false
+                if let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) {
+                    messageStore[convId]![idx].isStreaming = false
+                }
+                if selectedConversationId == convId,
+                   let visibleIdx = messages.lastIndex(where: { $0.isStreaming }) {
+                    messages[visibleIdx].isStreaming = false
                 }
                 isGenerating = false
             }
@@ -155,9 +172,7 @@ final class ChatViewModel: ObservableObject {
     // MARK: - Conversations
 
     func newConversation() {
-        generationTask?.cancel()
-        generationTask = nil
-        isGenerating = false
+        stopGeneration()
         Task { await session?.clearHistory() }
         let conv = Conversation.new()
         conversations.insert(conv, at: 0)
@@ -167,17 +182,14 @@ final class ChatViewModel: ObservableObject {
 
     func selectConversation(_ id: UUID) {
         guard id != selectedConversationId else { return }
-        stopGeneration()
-        Task { await session?.clearHistory() }
         selectedConversationId = id
-        messages = []
+        messages = messageStore[id] ?? []
     }
 
     // MARK: - Helpers
 
-    private func updateConversationMeta(firstMessage: String) {
-        guard let id = selectedConversationId,
-              let idx = conversations.firstIndex(where: { $0.id == id }) else { return }
+    private func updateConversationMeta(firstMessage: String, conversationId: UUID) {
+        guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
         if conversations[idx].title == "New chat" {
             conversations[idx].title = String(firstMessage.prefix(50))
         }
