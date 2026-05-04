@@ -417,10 +417,10 @@ struct ModelLoadingOverlayView: View {
                             .font(.system(size: 10.5, design: .monospaced))
                             .foregroundColor(LC.textSecondary)
                         Spacer()
-                        let remaining = (1.0 - p) * 6.0
-                        Text(String(format: "%.1fs remaining", remaining))
-                            .font(.system(size: 10.5, design: .monospaced))
-                            .foregroundColor(LC.textSecondary)
+//                        let remaining = (1.0 - p) * 6.0
+//                        Text(String(format: "%.1fs remaining", remaining))
+//                            .font(.system(size: 10.5, design: .monospaced))
+//                            .foregroundColor(LC.textSecondary)
                     } else {
                         Spacer()
                     }
