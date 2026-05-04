@@ -6,7 +6,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-            newChatAndSearch
+            newChatButton
             conversationList
             footer
         }
@@ -53,55 +53,33 @@ struct SidebarView: View {
         .hoverBackground(radius: 5)
     }
 
-    // MARK: - New chat + search
+    // MARK: - New chat
 
-    private var newChatAndSearch: some View {
-        VStack(spacing: 6) {
-            Button {
-                vm.newConversation()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("New chat")
-                        .font(.system(size: 12.5, weight: .medium))
-                    Spacer()
-                    Text("⌘N")
-                        .font(.system(size: 10))
-                        .foregroundColor(LC.textTertiary)
-                }
-                .foregroundColor(LC.textPrimary)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(white: 1.0, opacity: 0.06))
-                )
-                .lcBorder(Color(white: 1.0, opacity: 0.10), radius: 6)
-            }
-            .buttonStyle(.plain)
-            .keyboardShortcut("n", modifiers: .command)
-
+    private var newChatButton: some View {
+        Button {
+            vm.newConversation()
+        } label: {
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11))
-                    .foregroundColor(LC.textTertiary)
-                Text("Search conversations")
-                    .font(.system(size: 12))
-                    .foregroundColor(LC.textTertiary)
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("New chat")
+                    .font(.system(size: 12.5, weight: .medium))
                 Spacer()
-                Text("⌘F")
+                Text("⌘N")
                     .font(.system(size: 10))
-                    .foregroundColor(Color(white: 1.0, opacity: 0.35))
+                    .foregroundColor(LC.textTertiary)
             }
-            .padding(.horizontal, 8)
-            .frame(height: 26)
+            .foregroundColor(LC.textPrimary)
+            .padding(.horizontal, 10)
+            .frame(height: 28)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color(white: 0, opacity: 0.22))
+                    .fill(Color(white: 1.0, opacity: 0.06))
             )
-            .lcBorder(Color(white: 1.0, opacity: 0.06), radius: 6)
+            .lcBorder(Color(white: 1.0, opacity: 0.10), radius: 6)
         }
+        .buttonStyle(.plain)
+        .keyboardShortcut("n", modifiers: .command)
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
     }
@@ -165,16 +143,6 @@ struct SidebarView: View {
                 .font(.system(size: 12))
                 .foregroundColor(Color(white: 1.0, opacity: 0.85))
             Spacer()
-            Button {
-                // settings
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundColor(LC.textTertiary)
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.plain)
-            .hoverBackground(radius: 5)
         }
         .padding(.horizontal, 10)
         .frame(height: 44)

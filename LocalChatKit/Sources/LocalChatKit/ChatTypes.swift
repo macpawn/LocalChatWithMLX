@@ -57,6 +57,20 @@ public struct ChatResponse: Sendable, Equatable {
     }
 }
 
+public struct SamplingConfig: Sendable, Equatable {
+    public var temperature: Float
+    public var topP: Float
+    public var maxTokens: Int?
+
+    public init(temperature: Float = 0.7, topP: Float = 0.9, maxTokens: Int? = nil) {
+        self.temperature = temperature
+        self.topP = topP
+        self.maxTokens = maxTokens
+    }
+}
+
+public typealias GenerationOptions = SamplingConfig
+
 // MARK: - Download Progress
 
 public struct DownloadProgress: Sendable, Equatable {

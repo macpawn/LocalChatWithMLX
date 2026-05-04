@@ -55,9 +55,44 @@ struct Conversation: Identifiable, Equatable {
     var preview: String
     var createdAt: Date
     var isPinned: Bool
+    var model: LocalChatKit.Model
+    var generationOptions: SamplingConfig
 
-    static func new() -> Conversation {
-        Conversation(id: UUID(), title: "New chat", preview: "", createdAt: Date(), isPinned: false)
+    static func new(model: LocalChatKit.Model) -> Conversation {
+        Conversation(
+            id: UUID(),
+            title: "New chat",
+            preview: "",
+            createdAt: Date(),
+            isPinned: false,
+            model: model,
+            generationOptions: .init()
+        )
+    }
+}
+
+struct TokenLimitEditorState: Equatable {
+    var isEnabled: Bool
+    var text: String
+
+    init(maxTokens: Int?) {
+        self.isEnabled = maxTokens != nil
+        self.text = maxTokens.map(String.init) ?? ""
+    }
+
+    var maxTokens: Int? {
+        Int(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    mutating func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+        if !enabled {
+            text = ""
+        }
+    }
+
+    mutating func setText(_ newText: String) {
+        text = newText
     }
 }
 

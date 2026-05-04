@@ -34,7 +34,7 @@ public actor MockModelManager: ModelManagerProtocol {
 
     // MARK: - ModelManagerProtocol
 
-    public func isDownloaded(_ model: Model) -> Bool {
+    public func isDownloaded(_ model: Model, check: ModelDownloadCheckMode = .fast) async -> Bool {
         downloadedModels.contains(model)
     }
 

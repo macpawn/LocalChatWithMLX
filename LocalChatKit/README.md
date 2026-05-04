@@ -88,7 +88,8 @@ All models are downloaded from [mlx-community](https://huggingface.co/mlx-commun
 let manager = ModelManager()                                    // default cache location
 let manager = ModelManager(storage: .init(baseDirectory: url)) // custom cache
 
-await manager.isDownloaded(.llama3_2_1B)                       // Bool
+await manager.isDownloaded(.llama3_2_1B)                       // fast size check
+await manager.isDownloaded(.llama3_2_1B, check: .thorough)     // SHA-256 check
 try await manager.delete(.llama3_2_1B)                         // remove from disk
 for try await progress in manager.download(.llama3_2_1B) { }   // stream download
 for try await progress in manager.load(.llama3_2_1B) { }       // stream load into RAM
@@ -126,11 +127,13 @@ await session.clearHistory()           // resets the KV cache and message histor
 ### GenerationOptions
 
 ```swift
-let opts = GenerationOptions(temperature: 0.7, maxTokens: 512)
-let response = try await session.send("Hello", options: opts)
+let opts = GenerationOptions(temperature: 0.7, topP: 0.9, maxTokens: nil)
+for try await event in await session.sendStreaming("Hello", sampling: opts) {
+    // handle streamed tokens
+}
 ```
 
-> **V1 limitation:** `temperature` and `maxTokens` are accepted by the API but not yet forwarded to MLX — `MLXLMCommon` does not expose per-call generation parameters. These fields are reserved for a future release.
+`maxTokens` is optional. Pass `nil` to leave response length uncapped by LocalChatKit.
 
 ### GenerationStats
 

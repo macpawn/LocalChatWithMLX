@@ -1,10 +1,18 @@
+import LocalChatKit
 import SwiftUI
 
 struct ComposerView: View {
     var vm: ChatViewModel
-    @State private var inputText: String = ""
     @State private var isFocused: Bool = false
+    @State private var showGenerationSettings: Bool = false
     @FocusState private var focused: Bool
+
+    private var inputText: Binding<String> {
+        Binding(
+            get: { vm.selectedDraft },
+            set: { vm.selectedDraft = $0 }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -20,7 +28,7 @@ struct ComposerView: View {
     private var composerBox: some View {
         VStack(spacing: 0) {
             // Text area
-            TextEditor(text: $inputText)
+            TextEditor(text: inputText)
                 .font(.system(size: 13.5))
                 .foregroundColor(LC.textPrimary)
                 .scrollContentBackground(.hidden)
@@ -33,37 +41,26 @@ struct ComposerView: View {
                 .focused($focused)
                 .onSubmit { handleSend() }
 
-            // Bottom action bar
+            // Bottom status bar
             HStack(spacing: 4) {
-                // Attach
-                composerIconButton("paperclip")
-                // Mic
-                composerIconButton("mic")
-
-                // Params hint
                 HStack(spacing: 10) {
-                    Text("temp 0.7")
-                    Text("top_p 0.9")
-                    Text("ctx 8k")
+                    generationSettingsButton
+                    Text("temp \(formatDecimal(vm.selectedGenerationOptions.temperature))")
+                    Text("top_p \(formatDecimal(vm.selectedGenerationOptions.topP))")
+                    Text(maxTokensLabel)
                 }
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundColor(LC.textTertiary)
-                .padding(.leading, 10)
                 .padding(.horizontal, 4)
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color(white: 1.0, opacity: 0.08))
-                        .frame(width: 0.5)
-                }
 
                 Spacer()
 
                 // Char count / hint
                 Group {
-                    if inputText.isEmpty {
+                    if vm.selectedDraft.isEmpty {
                         Text("Enter · Shift+Enter for newline")
                     } else {
-                        Text("\(inputText.count) chars")
+                        Text("\(vm.selectedDraft.count) chars")
                     }
                 }
                 .font(.system(size: 11))
@@ -103,7 +100,7 @@ struct ComposerView: View {
         .animation(.easeInOut(duration: 0.15), value: isFocused)
         .onChange(of: focused) { _, newValue in isFocused = newValue }
         .onKeyPress(.return, phases: .down) { keyPress in
-            guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .ignored }
+            guard !vm.selectedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .ignored }
             if keyPress.modifiers.contains(.shift) { return .ignored }
             handleSend()
             return .handled
@@ -118,23 +115,43 @@ struct ComposerView: View {
         Button(action: handleSend) {
             Image(systemName: "arrow.up")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(white: 1.0, opacity: 0.3) : .white)
+                .foregroundColor(vm.selectedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(white: 1.0, opacity: 0.3) : .white)
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        .fill(vm.selectedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                               ? Color(white: 1.0, opacity: 0.06)
                               : LC.blue)
                 )
                 .shadow(
-                    color: LC.blue.opacity(inputText.isEmpty ? 0 : 0.3),
+                    color: LC.blue.opacity(vm.selectedDraft.isEmpty ? 0 : 0.3),
                     radius: 4,
                     y: 1
                 )
         }
         .buttonStyle(.plain)
-        .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.modelStatus != .ready)
+        .disabled(vm.selectedDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || vm.modelStatus != .ready)
         .keyboardShortcut(.return, modifiers: .command)
+    }
+
+    private var generationSettingsButton: some View {
+        Button {
+            showGenerationSettings.toggle()
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(LC.textSecondary)
+                .frame(width: 24, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color(white: 1.0, opacity: 0.05))
+                )
+        }
+        .buttonStyle(.plain)
+        .help("Generation settings")
+        .popover(isPresented: $showGenerationSettings, arrowEdge: .top) {
+            GenerationSettingsPopover(vm: vm)
+        }
     }
 
     private var stopButton: some View {
@@ -166,22 +183,160 @@ struct ComposerView: View {
 
     // MARK: - Helpers
 
-    private func composerIconButton(_ systemName: String) -> some View {
-        Button {} label: {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundColor(LC.textSecondary)
-                .frame(width: 26, height: 26)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverBackground(radius: 5)
-    }
-
     private func handleSend() {
-        let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = vm.selectedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, case .ready = vm.modelStatus else { return }
         vm.sendMessage(text)
-        inputText = ""
+        vm.selectedDraft = ""
+    }
+
+    private var maxTokensLabel: String {
+        if let maxTokens = vm.selectedGenerationOptions.maxTokens {
+            "max \(maxTokens)"
+        } else {
+            "max ∞"
+        }
+    }
+
+    private func formatDecimal(_ value: Float) -> String {
+        String(format: "%.2g", Double(value))
+    }
+}
+
+private struct GenerationSettingsPopover: View {
+    var vm: ChatViewModel
+    @State private var tokenLimitEditor: TokenLimitEditorState
+
+    init(vm: ChatViewModel) {
+        self.vm = vm
+        _tokenLimitEditor = State(
+            initialValue: TokenLimitEditorState(maxTokens: vm.selectedGenerationOptions.maxTokens)
+        )
+    }
+
+    private var options: SamplingConfig {
+        get { vm.selectedGenerationOptions }
+        nonmutating set { vm.selectedGenerationOptions = newValue }
+    }
+
+    private var temperature: Binding<Double> {
+        Binding(
+            get: { Double(options.temperature) },
+            set: {
+                var updated = options
+                updated.temperature = Float($0)
+                options = updated
+            }
+        )
+    }
+
+    private var topP: Binding<Double> {
+        Binding(
+            get: { Double(options.topP) },
+            set: {
+                var updated = options
+                updated.topP = Float($0)
+                options = updated
+            }
+        )
+    }
+
+    private var tokenLimitEnabled: Binding<Bool> {
+        Binding(
+            get: { tokenLimitEditor.isEnabled },
+            set: { enabled in
+                tokenLimitEditor.setEnabled(enabled)
+                applyTokenLimit()
+            }
+        )
+    }
+
+    private var maxTokensText: Binding<String> {
+        Binding(
+            get: { tokenLimitEditor.text },
+            set: { text in
+                tokenLimitEditor.setText(text)
+                applyTokenLimit()
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            settingHeader
+
+            VStack(alignment: .leading, spacing: 12) {
+                sliderRow(
+                    title: "Temperature",
+                    value: temperature,
+                    range: 0...2,
+                    displayValue: String(format: "%.2f", temperature.wrappedValue)
+                )
+
+                sliderRow(
+                    title: "Top P",
+                    value: topP,
+                    range: 0.05...1,
+                    displayValue: String(format: "%.2f", topP.wrappedValue)
+                )
+
+                Divider()
+                    .overlay(LC.divider)
+
+                Toggle("Limit response tokens", isOn: tokenLimitEnabled)
+                    .toggleStyle(.checkbox)
+
+                TextField("No limit", text: maxTokensText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 120)
+                    .disabled(!tokenLimitEnabled.wrappedValue)
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+        .background(LC.toolbarBg)
+    }
+
+    private var settingHeader: some View {
+        HStack {
+            Text("Generation")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(LC.textPrimary)
+            Spacer()
+            Button("Reset") {
+                vm.selectedGenerationOptions = .init()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(LC.blue)
+        }
+    }
+
+    private func sliderRow(
+        title: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        displayValue: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(displayValue)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(LC.textTertiary)
+            }
+            .font(.system(size: 12))
+            .foregroundColor(LC.textSecondary)
+
+            Slider(value: value, in: range)
+                .tint(LC.blue)
+        }
+    }
+
+    private func applyTokenLimit() {
+        var updated = options
+        updated.maxTokens = tokenLimitEditor.isEnabled ? tokenLimitEditor.maxTokens : nil
+        options = updated
     }
 }

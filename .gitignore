@@ -30,3 +30,6 @@ Package.resolved
 .swiftpm
 
 .build/
+
+# Git worktrees
+.worktrees/

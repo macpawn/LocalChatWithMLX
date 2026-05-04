@@ -23,7 +23,7 @@ final class AppSettings: AppSettingsProtocol {
         get {
             guard let raw = defaults.string(forKey: lastModelKey),
                   let model = LocalChatKit.Model(rawValue: raw) else {
-                return .gemma4_e2b
+                return .smolLM135M
             }
             return model
         }

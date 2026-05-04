@@ -1,3 +1,4 @@
+import LocalChatKit
 import SwiftUI
 
 struct ContentView: View {
@@ -42,14 +43,23 @@ struct ContentView: View {
             ModelLoadingOverlayView(
                 modelName: vm.selectedModel.displayName,
                 progress: progress,
-                stage: String(format: "Downloading · %.1f MB/s", speed)
+                stage: String(format: "Downloading · %.1f MB/s", speed),
+                cancel: { vm.cancelSelectedModelLoad() }
             )
         case .loading:
             ModelLoadingOverlayView(
                 modelName: vm.selectedModel.displayName,
                 progress: nil,
-                stage: "Loading into memory…"
+                stage: "Loading into memory…",
+                cancel: { vm.cancelSelectedModelLoad() }
             )
+        case .error(let message):
+            ModelErrorOverlayView(
+                modelName: vm.selectedModel.displayName,
+                message: message
+            ) {
+                vm.showModelLibrary = true
+            }
         default:
             EmptyView()
         }

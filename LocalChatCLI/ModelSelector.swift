@@ -3,6 +3,7 @@ import LocalChatKit
 
 struct ModelSelector {
     let manager: ModelManager
+    let downloader: HubDownloadManager
 
     func run() async -> LoadedModel {
         while true {
@@ -26,7 +27,7 @@ struct ModelSelector {
                     print("")
                     continue
                 }
-                guard await download(selected) else { continue }
+                guard await download(selected, using: downloader) else { continue }
             }
 
             if let loaded = await load(selected) {
@@ -53,9 +54,9 @@ struct ModelSelector {
         return answer == "y" || answer == "yes"
     }
 
-    private func download(_ model: Model) async -> Bool {
+    private func download(_ model: Model, using downloader: HubDownloadManager) async -> Bool {
         do {
-            let stream = await manager.download(model)
+            let stream = await downloader.download(model)
             for try await progress in stream {
                 print(TerminalOutput.formatDownloadProgress(progress), terminator: "")
                 fflush(stdout)

@@ -2,7 +2,8 @@ import Foundation
 import LocalChatKit
 
 let manager = ModelManager()
-let selector = ModelSelector(manager: manager)
+let downloader = HubDownloadManager()
+let selector = ModelSelector(manager: manager, downloader: downloader)
 
 let loadedModel = await selector.run()
 let session = ChatSession(model: loadedModel)

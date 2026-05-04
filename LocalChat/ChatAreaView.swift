@@ -1,3 +1,4 @@
+import LocalChatKit
 import SwiftUI
 
 struct ChatAreaView: View {
@@ -197,7 +198,6 @@ struct UserMessageView: View {
 struct AssistantMessageView: View {
     let message: ChatMessage
     let modelName: String
-    @State private var showActions = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -251,17 +251,10 @@ struct AssistantMessageView: View {
                         .padding(.top, 6)
                 }
 
-                // Action buttons
-                if !message.isStreaming {
-                    MessageActionsView()
-                        .padding(.top, 4)
-                        .opacity(showActions ? 1 : 0)
-                }
             }
             Spacer()
         }
         .padding(.vertical, 12)
-        .onHover { showActions = $0 }
     }
 }
 
@@ -346,38 +339,13 @@ struct MetricsFooterView: View {
     }
 }
 
-// MARK: - Message action buttons
-
-struct MessageActionsView: View {
-    var body: some View {
-        HStack(spacing: 2) {
-            actionButton("doc.on.doc", action: {})
-            actionButton("arrow.clockwise", action: {})
-            actionButton("arrow.branch", action: {})
-            actionButton("hand.thumbsup", action: {})
-        }
-        .padding(.leading, -4)
-    }
-
-    private func actionButton(_ systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(LC.textSecondary)
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverBackground(radius: 5)
-    }
-}
-
 // MARK: - Model loading overlay
 
 struct ModelLoadingOverlayView: View {
     let modelName: String
     let progress: Double?   // nil = indeterminate
     let stage: String
+    let cancel: () -> Void
 
     var body: some View {
         ZStack {
@@ -456,6 +424,71 @@ struct ModelLoadingOverlayView: View {
                     } else {
                         Spacer()
                     }
+                }
+                .padding(.bottom, 16)
+
+                HStack {
+                    Spacer()
+                    Button("Cancel", role: .cancel, action: cancel)
+                        .buttonStyle(SecondaryButtonStyle())
+                        .keyboardShortcut(.cancelAction)
+                }
+            }
+            .padding(24)
+            .frame(width: 360)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(red: 0.172, green: 0.172, blue: 0.180, opacity: 0.95))
+            )
+            .lcBorder(Color(white: 1.0, opacity: 0.12), radius: 12)
+            .shadow(color: .black.opacity(0.5), radius: 30, x: 0, y: 10)
+        }
+    }
+}
+
+struct ModelErrorOverlayView: View {
+    let modelName: String
+    let message: String
+    let chooseModel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(LC.red.opacity(0.18))
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(LC.red)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(modelName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(LC.textPrimary)
+                        Text("Could not load model")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(LC.textSecondary)
+                    }
+                }
+
+                Text(message)
+                    .font(.system(size: 12))
+                    .foregroundColor(LC.textSecondary)
+                    .lineSpacing(3)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack {
+                    Spacer()
+                    Button("Choose model", action: chooseModel)
+                        .buttonStyle(PrimaryButtonStyle())
                 }
             }
             .padding(24)

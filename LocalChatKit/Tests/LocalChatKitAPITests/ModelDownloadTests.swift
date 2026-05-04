@@ -20,10 +20,10 @@ struct ModelDownloadTests {
         var firstRealProgress: DownloadProgress?
 
         for try await event in await manager.download(.smolLM135M) {
-//            if event.bytesDownloaded > 0 {
-//                firstRealProgress = event
-//                break
-//            }
+            if event.bytesDownloaded > 0 {
+                firstRealProgress = event
+                break
+            }
         }
 
         let progress = try #require(firstRealProgress, "Expected at least one event with bytesDownloaded > 0")

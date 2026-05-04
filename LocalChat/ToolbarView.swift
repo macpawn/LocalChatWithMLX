@@ -1,3 +1,4 @@
+import LocalChatKit
 import SwiftUI
 
 struct ToolbarView: View {
@@ -32,16 +33,13 @@ struct ToolbarView: View {
 
             Spacer()
 
-            // Model pill
-            ModelPillView(vm: vm)
-                .onTapGesture { vm.showModelLibrary = true }
-
-            Spacer().frame(width: 4)
-
-            // Share
-            ToolbarIconButton(systemName: "square.and.arrow.up")
-            // More
-            ToolbarIconButton(systemName: "ellipsis")
+            Button {
+                vm.showModelLibrary = true
+            } label: {
+                ModelPillView(vm: vm)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choose model")
         }
         .padding(.horizontal, 10)
         .background(
@@ -138,25 +136,6 @@ struct PulsingRing: View {
             .opacity(animate ? 0 : 0.8)
             .animation(.easeOut(duration: 1.4).repeatForever(autoreverses: false), value: animate)
             .onAppear { animate = true }
-    }
-}
-
-// MARK: - Toolbar icon button
-
-struct ToolbarIconButton: View {
-    let systemName: String
-    var action: (() -> Void)? = nil
-
-    var body: some View {
-        Button { action?() } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundColor(Color(white: 1.0, opacity: 0.70))
-                .frame(width: 26, height: 26)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .hoverBackground(radius: 5)
     }
 }
 

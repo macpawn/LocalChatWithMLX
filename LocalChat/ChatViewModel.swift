@@ -12,7 +12,10 @@ final class ChatViewModel {
     // MARK: - Model state
 
     var selectedModel: LocalChatKit.Model
-    var modelStatus: ModelStatus = .unloaded
+    var modelStatus: ModelStatus {
+        get { modelStatusStore[selectedModel] ?? .unloaded }
+        set { modelStatusStore[selectedModel] = newValue }
+    }
 
     // MARK: - Conversations
 
@@ -31,15 +34,19 @@ final class ChatViewModel {
     var libraryTab: LibraryTab = .installed
     var downloadedModels: Set<LocalChatKit.Model> = []
 
-    enum LibraryTab: Equatable { case installed, browse, custom }
+    enum LibraryTab: Equatable { case installed, browse }
 
     // MARK: - Infrastructure
 
     private let manager = ModelManager()
-    private var loadedModel: LoadedModel?
-    private var session: ChatSession?
+    private let downloader = HubDownloadManager()
+    private var loadedModelStore: [LocalChatKit.Model: LoadedModel] = [:]
+    private var modelStatusStore: [LocalChatKit.Model: ModelStatus] = [:]
+    private var sessionStore: [UUID: ChatSession] = [:]
+    private var modelLoadTasks: [LocalChatKit.Model: Task<Void, Never>] = [:]
     private var generationTask: Task<Void, Never>?
     private var messageStore: [UUID: [ChatMessage]] = [:]
+    private var draftStore: [UUID: String] = [:]
 
     init(settings: AppSettingsProtocol = AppSettings.shared) {
         self.settings = settings
@@ -50,26 +57,40 @@ final class ChatViewModel {
 
     func loadSelectedModel() {
         guard case .unloaded = modelStatus else { return }
-        Task { @MainActor in
+        let modelToLoad = selectedModel
+        modelLoadTasks[modelToLoad]?.cancel()
+        modelLoadTasks[modelToLoad] = Task { @MainActor in
             do {
-                let isOnDisk = await manager.isDownloaded(selectedModel)
+                let isOnDisk = await manager.isDownloaded(modelToLoad)
                 if !isOnDisk {
-                    for try await progress in await manager.download(selectedModel) {
-                        modelStatus = .downloading(
+                    for try await progress in await downloader.download(modelToLoad) {
+                        guard !Task.isCancelled else { return }
+                        modelStatusStore[modelToLoad] = .downloading(
                             progress: Double(progress.percent) / 100.0,
                             speedMBps: progress.bytesPerSecond / 1_048_576
                         )
                     }
                 }
-                modelStatus = .loading
-                let model = try await manager.loadModel(selectedModel)
-                loadedModel = model
-                session = ChatSession(model: model, systemPrompt: "You are a helpful assistant.")
-                modelStatus = .ready
+                guard !Task.isCancelled else { return }
+                modelStatusStore[modelToLoad] = .loading
+                let model = try await manager.loadModel(modelToLoad)
+                guard !Task.isCancelled else { return }
+                loadedModelStore[modelToLoad] = model
+                modelStatusStore[modelToLoad] = .ready
+                modelLoadTasks[modelToLoad] = nil
+                if modelToLoad == selectedModel {
+                    createSessionForSelectedConversationIfNeeded()
+                }
             } catch {
-                modelStatus = .error(error.localizedDescription)
+                guard !Task.isCancelled else { return }
+                modelStatusStore[modelToLoad] = .error(error.localizedDescription)
+                modelLoadTasks[modelToLoad] = nil
             }
         }
+    }
+
+    func cancelSelectedModelLoad() {
+        cancelLoadIfNeeded(for: selectedModel)
     }
 
     func refreshDownloadedModels() {
@@ -84,29 +105,35 @@ final class ChatViewModel {
 
     func selectModel(_ model: LocalChatKit.Model) {
         guard model != selectedModel else { return }
+        guard canChangeModelForSelectedConversation else { return }
+        cancelLoadIfNeeded(for: selectedModel)
         generationTask?.cancel()
         generationTask = nil
         isGenerating = false
-        loadedModel = nil
-        session = nil
+        if let selectedConversationId {
+            sessionStore[selectedConversationId] = nil
+            updateSelectedConversation { $0.model = model }
+        }
         selectedModel = model
-        modelStatus = .unloaded
+        synchronizeModelStatusForSelectedConversation()
         settings.lastSelectedModel = model
     }
 
     // MARK: - Chat
 
     func sendMessage(_ text: String) {
-        guard case .ready = modelStatus, let session else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
 
         if selectedConversationId == nil {
             newConversation()
         }
 
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard case .ready = modelStatus,
+              loadedModelStore[selectedModel] != nil,
+              let convId = selectedConversationId,
+              let session = sessionForSelectedConversation() else { return }
 
-        let convId = selectedConversationId!
         let assistantId = UUID()
 
         messages.append(.user(trimmed))
@@ -117,7 +144,8 @@ final class ChatViewModel {
         generationTask = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                for try await event in await session.sendStreaming(trimmed) {
+                let sampling = selectedGenerationOptions
+                for try await event in await session.sendStreaming(trimmed, sampling: sampling) {
                     guard !Task.isCancelled else { break }
                     switch event {
                     case .token(let token):
@@ -163,30 +191,119 @@ final class ChatViewModel {
     func stopGeneration() {
         generationTask?.cancel()
         generationTask = nil
+        if let convId = selectedConversationId,
+           let idx = messageStore[convId]?.lastIndex(where: { $0.isStreaming }) {
+            messageStore[convId]![idx].isStreaming = false
+        }
         if let idx = messages.lastIndex(where: { $0.isStreaming }) {
             messages[idx].isStreaming = false
         }
         isGenerating = false
     }
 
+    var selectedDraft: String {
+        get {
+            guard let selectedConversationId else { return "" }
+            return draftStore[selectedConversationId] ?? ""
+        }
+        set {
+            if selectedConversationId == nil {
+                newConversation()
+            }
+            guard let selectedConversationId else { return }
+            draftStore[selectedConversationId] = newValue
+        }
+    }
+
+    var selectedGenerationOptions: SamplingConfig {
+        get {
+            guard let selectedConversationId,
+                  let conversation = conversations.first(where: { $0.id == selectedConversationId }) else {
+                return .init()
+            }
+            return conversation.generationOptions
+        }
+        set {
+            if selectedConversationId == nil {
+                newConversation()
+            }
+            updateSelectedConversation { $0.generationOptions = newValue }
+        }
+    }
+
     // MARK: - Conversations
 
     func newConversation() {
         stopGeneration()
-        Task { await session?.clearHistory() }
-        let conv = Conversation.new()
+        let conv = Conversation.new(model: settings.lastSelectedModel)
         conversations.insert(conv, at: 0)
         selectedConversationId = conv.id
+        selectedModel = conv.model
         messages = []
+        synchronizeModelStatusForSelectedConversation()
     }
 
     func selectConversation(_ id: UUID) {
         guard id != selectedConversationId else { return }
         selectedConversationId = id
         messages = messageStore[id] ?? []
+        if let conversation = conversations.first(where: { $0.id == id }) {
+            selectedModel = conversation.model
+            synchronizeModelStatusForSelectedConversation()
+        }
     }
 
     // MARK: - Helpers
+
+    var canChangeModelForSelectedConversation: Bool {
+        guard let selectedConversationId else { return true }
+        return (messageStore[selectedConversationId] ?? messages).isEmpty
+    }
+
+    private func createSessionForSelectedConversationIfNeeded() {
+        guard let selectedConversationId,
+              sessionStore[selectedConversationId] == nil,
+              case .ready = modelStatus,
+              let loadedModel = loadedModelStore[selectedModel] else { return }
+        sessionStore[selectedConversationId] = ChatSession(
+            model: loadedModel,
+            systemPrompt: "You are a helpful assistant."
+        )
+    }
+
+    private func sessionForSelectedConversation() -> ChatSession? {
+        createSessionForSelectedConversationIfNeeded()
+        guard let selectedConversationId else { return nil }
+        return sessionStore[selectedConversationId]
+    }
+
+    private func synchronizeModelStatusForSelectedConversation() {
+        if modelStatusStore[selectedModel] == nil {
+            modelStatusStore[selectedModel] = .unloaded
+        }
+
+        if case .ready = modelStatus {
+            createSessionForSelectedConversationIfNeeded()
+        }
+    }
+
+    private func cancelLoadIfNeeded(for model: LocalChatKit.Model) {
+        guard let status = modelStatusStore[model] else { return }
+        switch status {
+        case .downloading, .loading:
+            modelLoadTasks[model]?.cancel()
+            modelLoadTasks[model] = nil
+            modelStatusStore[model] = loadedModelStore[model] == nil ? .unloaded : .ready
+        default:
+            break
+        }
+    }
+
+    private func updateSelectedConversation(_ update: (inout Conversation) -> Void) {
+        guard let selectedConversationId,
+              let idx = conversations.firstIndex(where: { $0.id == selectedConversationId }) else { return }
+        update(&conversations[idx])
+    }
 
     private func updateConversationMeta(firstMessage: String, conversationId: UUID) {
         guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
@@ -229,3 +346,15 @@ final class ChatViewModel {
         ].filter { !$0.items.isEmpty }
     }
 }
+
+#if DEBUG
+extension ChatViewModel {
+    func markModelReadyForTesting(_ model: LocalChatKit.Model) {
+        modelStatusStore[model] = .ready
+    }
+
+    func markModelDownloadingForTesting(_ model: LocalChatKit.Model) {
+        modelStatusStore[model] = .downloading(progress: 0.25, speedMBps: 1.0)
+    }
+}
+#endif

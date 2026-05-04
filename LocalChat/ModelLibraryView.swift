@@ -5,7 +5,6 @@ struct ModelLibraryView: View {
     var vm: ChatViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var search: String = ""
-    @State private var customPath: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,8 +68,6 @@ struct ModelLibraryView: View {
                 modelListContent(models: allModels.filter { $0.isDownloaded })
             case .browse:
                 modelListContent(models: allModels)
-            case .custom:
-                customPathContent
             }
         }
         .background(Color(red: 0.149, green: 0.149, blue: 0.157, opacity: 0.95))
@@ -86,14 +83,12 @@ struct ModelLibraryView: View {
     enum TabItem: String, CaseIterable, Identifiable {
         case installed = "Installed"
         case browse    = "Browse"
-        case custom    = "Load custom"
 
         var id: String { rawValue }
         var vmTab: ChatViewModel.LibraryTab {
             switch self {
             case .installed: return .installed
             case .browse:    return .browse
-            case .custom:    return .custom
             }
         }
     }
@@ -179,81 +174,6 @@ struct ModelLibraryView: View {
         return models.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
 
-    // MARK: - Custom path
-
-    private var customPathContent: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Load from local path")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(LC.textPrimary)
-                Text("Point to a local MLX model directory. LocalChat will mmap it into the active runtime.")
-                    .font(.system(size: 12))
-                    .foregroundColor(LC.textSecondary)
-                    .lineSpacing(3)
-            }
-
-            // Drop zone
-            VStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(LC.blue.opacity(0.15))
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundColor(Color(red: 0.392, green: 0.710, blue: 1.0))
-                }
-                .frame(width: 44, height: 44)
-                Text("Drag a model file here, or")
-                    .font(.system(size: 12.5))
-                    .foregroundColor(Color(white: 1.0, opacity: 0.85))
-                Button("Choose file…") {}
-                    .buttonStyle(SecondaryButtonStyle())
-            }
-            .frame(maxWidth: .infinity)
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(white: 1.0, opacity: 0.02))
-                    .lcBorder(Color(white: 1.0, opacity: 0.2), radius: 10)
-            )
-
-            // Path field
-            VStack(alignment: .leading, spacing: 6) {
-                Text("PATH")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(LC.textTertiary)
-                    .tracking(0.3)
-                HStack(spacing: 8) {
-                    TextField("~/Models/my-model", text: $customPath)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundColor(LC.textPrimary)
-                        .textFieldStyle(.plain)
-                    Button("Browse…") {}
-                        .buttonStyle(SecondaryButtonStyle())
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 30)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(white: 0, opacity: 0.3))
-                )
-                .lcBorder(Color(white: 1.0, opacity: 0.10), radius: 6)
-            }
-
-            Spacer()
-
-            // Footer buttons
-            HStack(spacing: 8) {
-                Spacer()
-                Button("Cancel") { dismiss() }
-                    .buttonStyle(SecondaryButtonStyle())
-                Button("Load model") {}
-                    .buttonStyle(PrimaryButtonStyle())
-            }
-        }
-        .padding(24)
-    }
-
     // MARK: - Model data
 
     struct ModelMeta: Identifiable {
@@ -266,16 +186,31 @@ struct ModelLibraryView: View {
         let isDownloaded: Bool
         let isActive: Bool
         let isRecommended: Bool
+
+        static let catalog: [ModelMeta] = [
+            ModelMeta(id: .smolLM135M,  name: "SmolLM 135M Instruct",   params: "135M", quant: "4bit", size: "~0.1 GB", ctx: "2k",   isDownloaded: false, isActive: false, isRecommended: false),
+            ModelMeta(id: .gemma4_e2b,  name: "Gemma 4 E2B Instruct",   params: "2B",   quant: "Q4",   size: "~2 GB",   ctx: "8k",   isDownloaded: false, isActive: false, isRecommended: false),
+            ModelMeta(id: .gemma4_e4b,  name: "Gemma 4 E4B Instruct",   params: "4B",   quant: "Q4",   size: "~4 GB",   ctx: "8k",   isDownloaded: false, isActive: false, isRecommended: true),
+            ModelMeta(id: .llama3_2_1B, name: "Llama 3.2 1B Instruct",  params: "1B",   quant: "4bit", size: "~0.7 GB", ctx: "128k", isDownloaded: false, isActive: false, isRecommended: false),
+            ModelMeta(id: .llama3_2_3B, name: "Llama 3.2 3B Instruct",  params: "3B",   quant: "4bit", size: "~2 GB",   ctx: "128k", isDownloaded: false, isActive: false, isRecommended: false),
+        ]
     }
 
     private var allModels: [ModelMeta] {
         let isActive = vm.modelStatus == .ready
-        return [
-            ModelMeta(id: .gemma4_e2b,  name: "Gemma 4 E2B Instruct",   params: "2B",  quant: "Q4",   size: "~2 GB",   ctx: "8k",   isDownloaded: vm.downloadedModels.contains(.gemma4_e2b),  isActive: isActive && vm.selectedModel == .gemma4_e2b,  isRecommended: false),
-            ModelMeta(id: .gemma4_e4b,  name: "Gemma 4 E4B Instruct",   params: "4B",  quant: "Q4",   size: "~4 GB",   ctx: "8k",   isDownloaded: vm.downloadedModels.contains(.gemma4_e4b),  isActive: isActive && vm.selectedModel == .gemma4_e4b,  isRecommended: true),
-            ModelMeta(id: .llama3_2_1B, name: "Llama 3.2 1B Instruct",  params: "1B",  quant: "4bit", size: "~0.7 GB", ctx: "128k", isDownloaded: vm.downloadedModels.contains(.llama3_2_1B), isActive: isActive && vm.selectedModel == .llama3_2_1B, isRecommended: false),
-            ModelMeta(id: .llama3_2_3B, name: "Llama 3.2 3B Instruct",  params: "3B",  quant: "4bit", size: "~2 GB",   ctx: "128k", isDownloaded: vm.downloadedModels.contains(.llama3_2_3B), isActive: isActive && vm.selectedModel == .llama3_2_3B, isRecommended: false),
-        ]
+        return ModelMeta.catalog.map { model in
+            ModelMeta(
+                id: model.id,
+                name: model.name,
+                params: model.params,
+                quant: model.quant,
+                size: model.size,
+                ctx: model.ctx,
+                isDownloaded: vm.downloadedModels.contains(model.id),
+                isActive: isActive && vm.selectedModel == model.id,
+                isRecommended: model.isRecommended
+            )
+        }
     }
 }
 
@@ -360,6 +295,27 @@ struct ModelRowView: View {
                         .fill(Color.clear)
                 )
                 .lcBorder(Color(white: 1.0, opacity: 0.12), radius: 6)
+        } else if !vm.canChangeModelForSelectedConversation {
+            Text("Locked")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(LC.textTertiary)
+                .padding(.horizontal, 12)
+                .frame(height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.clear)
+                )
+                .lcBorder(Color(white: 1.0, opacity: 0.08), radius: 6)
+        } else if model.id == vm.selectedModel, case .downloading = vm.modelStatus {
+            Button("Cancel") {
+                vm.cancelSelectedModelLoad()
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        } else if model.id == vm.selectedModel, case .loading = vm.modelStatus {
+            Button("Cancel") {
+                vm.cancelSelectedModelLoad()
+            }
+            .buttonStyle(SecondaryButtonStyle())
         } else if model.isDownloaded {
             Button("Load") {
                 vm.selectModel(model.id)

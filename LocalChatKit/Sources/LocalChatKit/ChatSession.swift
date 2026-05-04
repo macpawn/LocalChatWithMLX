@@ -1,80 +1,134 @@
 import Foundation
-import MLXLMCommon
 
 public actor ChatSession: ChatSessionProtocol {
-    private let mlxSession: MLXLMCommon.ChatSession
-    private var _history: [ChatMessage] = []
+    public private(set) var history: [ChatMessage]
 
-    public init(model: LoadedModel, systemPrompt: String? = nil) {
-        self.mlxSession = MLXLMCommon.ChatSession(
-            model.container,
-            instructions: systemPrompt
+    private let loadedModel: LoadedModel
+    private let systemPrompt: String?
+    private let sampling: SamplingConfig
+    private let template: any ChatTemplate
+
+    public init(
+        loadedModel: LoadedModel,
+        systemPrompt: String? = nil,
+        sampling: SamplingConfig = .init(),
+        template: any ChatTemplate
+    ) {
+        self.loadedModel = loadedModel
+        self.systemPrompt = systemPrompt
+        self.sampling = sampling
+        self.template = template
+        self.history = []
+    }
+
+    public init(
+        loadedModel: LoadedModel,
+        systemPrompt: String? = nil,
+        sampling: SamplingConfig = .init()
+    ) {
+        self.init(
+            loadedModel: loadedModel,
+            systemPrompt: systemPrompt,
+            sampling: sampling,
+            template: loadedModel.model.chatTemplate
         )
     }
 
-    // MARK: - ChatSessionProtocol
+    public init(model: LoadedModel, systemPrompt: String? = nil) {
+        self.loadedModel = model
+        self.systemPrompt = systemPrompt
+        self.sampling = .init()
+        self.template = model.model.chatTemplate
+        self.history = []
+    }
 
     public func sendStreaming(_ message: String) -> AsyncThrowingStream<ChatEvent, Error> {
-        return AsyncThrowingStream(ChatEvent.self) { continuation in
+        sendStreaming(message, sampling: sampling)
+    }
+
+    public func sendStreaming(
+        _ message: String,
+        sampling: SamplingConfig
+    ) -> AsyncThrowingStream<ChatEvent, Error> {
+        history.append(.init(role: .user, content: message))
+
+        let messages = renderedMessages()
+        let prompt = template.render(messages: messages)
+        let generator = loadedModel.generator
+        let startTime = Date()
+
+        return AsyncThrowingStream { continuation in
             let task = Task {
-                var fullResponse = ""
-                let startTime = Date()
-                var firstTokenDate: Date? = nil
+                do {
+                    var content = ""
+                    var generatedTokenCount = 0
+                    var firstTokenDate: Date? = nil
 
-                await withTaskCancellationHandler {
-                    do {
-                        for try await generation in self.mlxSession.streamDetails(
-                            to: message, images: [], videos: []
-                        ) {
-                            switch generation {
-                            case .chunk(let text):
-                                if firstTokenDate == nil { firstTokenDate = Date() }
-                                fullResponse += text
-                                if case .terminated = continuation.yield(.token(text)) { return }
+                    var generationInfo: ChatGenerationInfo?
 
-                            case .info(let info):
-                                let stats = GenerationStats(
-                                    timeToFirstToken: firstTokenDate.map {
-                                        $0.timeIntervalSince(startTime)
-                                    } ?? 0,
-                                    tokensPerSecond: info.tokensPerSecond,
-                                    promptTokenCount: info.promptTokenCount,
-                                    generatedTokenCount: info.generationTokenCount,
-                                    totalDuration: Date().timeIntervalSince(startTime)
-                                )
-                                continuation.yield(.completed(stats))
-
-                            case .toolCall:
-                                break
+                    for try await event in generator.generate(
+                        prompt: prompt,
+                        messages: messages,
+                        sampling: sampling
+                    ) {
+                        switch event {
+                        case .chunk(let token):
+                            if firstTokenDate == nil {
+                                firstTokenDate = Date()
                             }
+                            content += token
+                            generatedTokenCount += 1
+
+                            if case .terminated = continuation.yield(.token(token)) {
+                                return
+                            }
+                        case .info(let info):
+                            generationInfo = info
                         }
-                        self._history.append(ChatMessage(role: .user, content: message))
-                        self._history.append(ChatMessage(role: .assistant, content: fullResponse))
-                        continuation.finish()
-                    } catch is CancellationError {
-                        continuation.finish(throwing: CancellationError())
-                    } catch {
-                        continuation.finish(
-                            throwing: LocalChatError.generationFailed(underlying: error)
-                        )
                     }
-                } onCancel: {
+
+                    let totalDuration = Date().timeIntervalSince(startTime)
+                    let stats = GenerationStats(
+                        timeToFirstToken: firstTokenDate.map {
+                            $0.timeIntervalSince(startTime)
+                        } ?? 0,
+                        tokensPerSecond: generationInfo?.tokensPerSecond
+                            ?? (totalDuration > 0
+                                ? Double(generatedTokenCount) / totalDuration
+                                : 0),
+                        promptTokenCount: generationInfo?.promptTokenCount
+                            ?? prompt.split(whereSeparator: \.isWhitespace).count,
+                        generatedTokenCount: generationInfo?.generatedTokenCount
+                            ?? generatedTokenCount,
+                        totalDuration: totalDuration
+                    )
+
+                    self.appendAssistantMessage(content)
+                    continuation.yield(.completed(stats))
+                    continuation.finish()
+                } catch is CancellationError {
                     continuation.finish(throwing: CancellationError())
+                } catch {
+                    continuation.finish(
+                        throwing: LocalChatError.generationFailed(underlying: error)
+                    )
                 }
             }
+
             continuation.onTermination = { _ in task.cancel() }
         }
     }
 
-    /// Sends a message and returns the complete response.
     public func send(_ message: String) async throws -> ChatResponse {
         var fullText = ""
-        var stats: GenerationStats? = nil
+        var stats: GenerationStats?
 
         for try await event in sendStreaming(message) {
             switch event {
-            case .token(let text):   fullText += text
-            case .completed(let s): stats = s
+            case .token(let text):
+                fullText += text
+            case .completed(let generationStats):
+                stats = generationStats
             }
         }
 
@@ -87,15 +141,23 @@ public actor ChatSession: ChatSessionProtocol {
                 )
             )
         }
+
         return ChatResponse(text: fullText, stats: stats)
     }
 
-    /// Conversation history, excluding the system prompt.
-    public var history: [ChatMessage] { _history }
-
-    /// Clears conversation history and resets the underlying KV cache.
     public func clearHistory() async {
-        _history = []
-        await mlxSession.clear()
+        history.removeAll()
+    }
+
+    private func renderedMessages() -> [ChatMessage] {
+        if let systemPrompt, !systemPrompt.isEmpty {
+            [.init(role: .system, content: systemPrompt)] + history
+        } else {
+            history
+        }
+    }
+
+    private func appendAssistantMessage(_ content: String) {
+        history.append(.init(role: .assistant, content: content))
     }
 }

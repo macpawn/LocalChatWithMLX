@@ -62,6 +62,17 @@ extension Model {
         }
     }
 
+    var chatTemplate: any ChatTemplate {
+        switch self {
+        case .smolLM135M:
+            SmolLMChatTemplate()
+        case .gemma4_e4b, .gemma4_e2b:
+            Gemma4ChatTemplate()
+        case .llama3_2_1B, .llama3_2_3B:
+            Llama32ChatTemplate()
+        }
+    }
+
     /// Directory name used by HubCache: `models--{org}--{repo}`
     var hubCacheDirName: String {
         "models--" + huggingFaceID.replacingOccurrences(of: "/", with: "--")
