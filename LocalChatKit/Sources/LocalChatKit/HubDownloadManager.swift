@@ -75,7 +75,7 @@ public actor HubDownloadManager: HubDownloaderProtocol {
                     try await withThrowingTaskGroup(of: Void.self) { group in
                         for file in meta.files {
                             group.addTask {
-                                await semaphore.acquire()
+                                try await semaphore.acquire()
                                 do {
                                     let blobKey = file.sha256.isEmpty ? file.relativePath : file.sha256
                                     let blobPath = dirs.blobs.appendingPathComponent(blobKey)

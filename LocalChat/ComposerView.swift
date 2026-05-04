@@ -304,7 +304,9 @@ private struct GenerationSettingsPopover: View {
                 .foregroundColor(LC.textPrimary)
             Spacer()
             Button("Reset") {
-                vm.selectedGenerationOptions = .init()
+                let defaults = SamplingConfig()
+                vm.selectedGenerationOptions = defaults
+                tokenLimitEditor.reset(maxTokens: defaults.maxTokens)
             }
             .buttonStyle(.plain)
             .font(.system(size: 12, weight: .medium))

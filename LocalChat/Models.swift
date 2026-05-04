@@ -94,6 +94,10 @@ struct TokenLimitEditorState: Equatable {
     mutating func setText(_ newText: String) {
         text = newText
     }
+
+    mutating func reset(maxTokens: Int?) {
+        self = TokenLimitEditorState(maxTokens: maxTokens)
+    }
 }
 
 // MARK: - Model Metadata

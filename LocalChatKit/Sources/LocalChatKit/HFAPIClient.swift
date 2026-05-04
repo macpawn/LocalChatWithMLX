@@ -69,7 +69,7 @@ func fetchHFRepoMeta(
     let files: [HFFileMeta] = try await withThrowingTaskGroup(of: HFFileMeta?.self) { group in
         for file in filteredFiles {
             group.addTask {
-                await semaphore.acquire()
+                try await semaphore.acquire()
                 do {
                     let result = try await fetchSingleFileMeta(
                         modelID: modelID,

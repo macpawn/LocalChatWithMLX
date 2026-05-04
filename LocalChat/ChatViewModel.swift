@@ -127,6 +127,7 @@ final class ChatViewModel {
     func sendMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        guard !isGenerating else { return }
 
         if selectedConversationId == nil {
             newConversation()

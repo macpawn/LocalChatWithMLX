@@ -100,6 +100,16 @@ struct LocalChatTests {
         #expect(editor.maxTokens == 64)
     }
 
+    @Test func tokenLimitEditorCanResetToNoLimit() {
+        var editor = TokenLimitEditorState(maxTokens: 256)
+
+        editor.reset(maxTokens: nil)
+
+        #expect(!editor.isEnabled)
+        #expect(editor.text == "")
+        #expect(editor.maxTokens == nil)
+    }
+
     @Test func selectingModelUpdatesEmptyCurrentConversationAndDefaultForFutureChats() {
         let settings = MockSettings(lastSelectedModel: .gemma4_e2b)
         let vm = ChatViewModel(settings: settings)
@@ -164,6 +174,18 @@ struct LocalChatTests {
         vm.cancelSelectedModelLoad()
 
         #expect(vm.modelStatus == .unloaded)
+    }
+
+    @Test func sendMessageDoesNothingWhileGenerationIsRunning() {
+        let settings = MockSettings(lastSelectedModel: .smolLM135M)
+        let vm = ChatViewModel(settings: settings)
+        vm.isGenerating = true
+
+        vm.sendMessage("Hello")
+
+        #expect(vm.conversations.isEmpty)
+        #expect(vm.messages.isEmpty)
+        #expect(vm.isGenerating)
     }
 }
 
