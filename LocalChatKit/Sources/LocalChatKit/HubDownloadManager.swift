@@ -1,5 +1,24 @@
 import Foundation
 
+struct HubDownloadConfiguration: Sendable {
+    let chunkedDownloadThreshold: Int64
+    let chunkSize: Int64
+    let maxConcurrentChunksPerFile: Int
+
+    init(
+        chunkedDownloadThreshold: Int64 = 64 * 1024 * 1024,
+        chunkSize: Int64 = 16 * 1024 * 1024,
+        maxConcurrentChunksPerFile: Int = 4
+    ) {
+        precondition(chunkedDownloadThreshold > 0, "Chunked download threshold must be positive")
+        precondition(chunkSize > 0, "Chunk size must be positive")
+        precondition(maxConcurrentChunksPerFile > 0, "Chunk concurrency must be positive")
+        self.chunkedDownloadThreshold = chunkedDownloadThreshold
+        self.chunkSize = chunkSize
+        self.maxConcurrentChunksPerFile = maxConcurrentChunksPerFile
+    }
+}
+
 // MARK: - HubDownloadManager
 
 public actor HubDownloadManager: HubDownloaderProtocol {
@@ -7,6 +26,8 @@ public actor HubDownloadManager: HubDownloaderProtocol {
     public let storage: ModelStorageConfig
     private let modelFileRegistry: ModelFileManifestRegistry
     private let repoMetadataProvider: any HFRepoMetadataProviding
+    private let session: URLSession
+    private let downloadConfiguration: HubDownloadConfiguration
 
     public init(
         storage: ModelStorageConfig = .default,
@@ -15,18 +36,24 @@ public actor HubDownloadManager: HubDownloaderProtocol {
         self.init(
             storage: storage,
             modelFileRegistry: modelFileRegistry,
-            repoMetadataProvider: LiveHFRepoMetadataProvider()
+            repoMetadataProvider: LiveHFRepoMetadataProvider(),
+            session: .shared,
+            downloadConfiguration: HubDownloadConfiguration()
         )
     }
 
     init(
         storage: ModelStorageConfig,
         modelFileRegistry: ModelFileManifestRegistry = ModelFileManifestRegistry(),
-        repoMetadataProvider: any HFRepoMetadataProviding
+        repoMetadataProvider: any HFRepoMetadataProviding,
+        session: URLSession = .shared,
+        downloadConfiguration: HubDownloadConfiguration = HubDownloadConfiguration()
     ) {
         self.storage = storage
         self.modelFileRegistry = modelFileRegistry
         self.repoMetadataProvider = repoMetadataProvider
+        self.session = session
+        self.downloadConfiguration = downloadConfiguration
     }
 
     // MARK: - Public API
@@ -59,6 +86,8 @@ public actor HubDownloadManager: HubDownloaderProtocol {
 
     public nonisolated func download(_ model: Model) -> AsyncThrowingStream<DownloadProgress, Error> {
         let storage = self.storage
+        let session = self.session
+        let downloadConfiguration = self.downloadConfiguration
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
@@ -102,7 +131,13 @@ public actor HubDownloadManager: HubDownloaderProtocol {
                                         throw HFError.invalidURL
                                     }
 
-                                    for try await written in self.streamDownload(from: remoteURL, to: blobPath) {
+                                    for try await written in self.streamDownload(
+                                        from: remoteURL,
+                                        to: blobPath,
+                                        expectedSize: file.size,
+                                        session: session,
+                                        configuration: downloadConfiguration
+                                    ) {
                                         let (current, speed) = await progress.update(file: file.relativePath, written: written)
                                         continuation.yield(DownloadProgress(
                                             percent: hfPct(current, of: totalBytes),
@@ -154,38 +189,46 @@ public actor HubDownloadManager: HubDownloaderProtocol {
 
     // MARK: - Download Stream
 
-    nonisolated private func streamDownload(from url: URL, to destination: URL) -> AsyncThrowingStream<Int64, Error> {
+    nonisolated private func streamDownload(
+        from url: URL,
+        to destination: URL,
+        expectedSize: Int64,
+        session: URLSession,
+        configuration: HubDownloadConfiguration
+    ) -> AsyncThrowingStream<Int64, Error> {
         AsyncThrowingStream { c in
             let task = Task {
                 do {
-                    let (asyncBytes, response) = try await URLSession.shared.bytes(from: url)
-                    if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                        throw URLError(.badServerResponse)
-                    }
-                    let tmp = FileManager.default.temporaryDirectory
-                        .appendingPathComponent(UUID().uuidString)
-                    FileManager.default.createFile(atPath: tmp.path, contents: nil)
-                    let fh = try FileHandle(forWritingTo: tmp)
-                    var buf = [UInt8]()
-                    buf.reserveCapacity(1024 * 1024)
-                    var total: Int64 = 0
-                    for try await byte in asyncBytes {
-                        try Task.checkCancellation()
-                        buf.append(byte)
-                        if buf.count >= 1024 * 1024 {
-                            try fh.write(contentsOf: buf)
-                            total += Int64(buf.count)
-                            buf.removeAll(keepingCapacity: true)
-                            c.yield(total)
+                    if expectedSize > configuration.chunkedDownloadThreshold {
+                        do {
+                            try await self.chunkedDownload(
+                                from: url,
+                                to: destination,
+                                expectedSize: expectedSize,
+                                session: session,
+                                configuration: configuration,
+                                progress: { c.yield($0) }
+                            )
+                            c.finish()
+                            return
+                        } catch is RangeDownloadUnsupported {
+                            try await self.singleStreamDownload(
+                                from: url,
+                                to: destination,
+                                session: session,
+                                progress: { c.yield($0) }
+                            )
+                            c.finish()
+                            return
                         }
                     }
-                    if !buf.isEmpty {
-                        try fh.write(contentsOf: buf)
-                        total += Int64(buf.count)
-                    }
-                    try fh.close()
-                    try FileManager.default.moveItem(at: tmp, to: destination)
-                    c.yield(total)
+
+                    try await self.singleStreamDownload(
+                        from: url,
+                        to: destination,
+                        session: session,
+                        progress: { c.yield($0) }
+                    )
                     c.finish()
                 } catch {
                     c.finish(throwing: error)
@@ -194,6 +237,184 @@ public actor HubDownloadManager: HubDownloaderProtocol {
             c.onTermination = { _ in task.cancel() }
         }
     }
+
+    nonisolated private func singleStreamDownload(
+        from url: URL,
+        to destination: URL,
+        session: URLSession,
+        progress: (Int64) -> Void
+    ) async throws {
+        let (asyncBytes, response) = try await session.bytes(from: url)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
+
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        fm.createFile(atPath: tmp.path, contents: nil)
+        let fh = try FileHandle(forWritingTo: tmp)
+        var didClose = false
+        defer {
+            if !didClose {
+                try? fh.close()
+            }
+            try? fm.removeItem(at: tmp)
+        }
+
+        var buf = [UInt8]()
+        buf.reserveCapacity(1024 * 1024)
+        var total: Int64 = 0
+        for try await byte in asyncBytes {
+            try Task.checkCancellation()
+            buf.append(byte)
+            if buf.count >= 1024 * 1024 {
+                try fh.write(contentsOf: buf)
+                total += Int64(buf.count)
+                buf.removeAll(keepingCapacity: true)
+                progress(total)
+            }
+        }
+        if !buf.isEmpty {
+            try fh.write(contentsOf: buf)
+            total += Int64(buf.count)
+        }
+        try fh.close()
+        didClose = true
+        try? fm.removeItem(at: destination)
+        try fm.moveItem(at: tmp, to: destination)
+        progress(total)
+    }
+
+    nonisolated private func chunkedDownload(
+        from url: URL,
+        to destination: URL,
+        expectedSize: Int64,
+        session: URLSession,
+        configuration: HubDownloadConfiguration,
+        progress: (Int64) -> Void
+    ) async throws {
+        let fm = FileManager.default
+        let tempDir = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: tempDir) }
+
+        let ranges = byteRanges(totalSize: expectedSize, chunkSize: configuration.chunkSize)
+        let semaphore = AsyncSemaphore(limit: configuration.maxConcurrentChunksPerFile)
+        var results: [ChunkDownloadResult] = []
+        var completedBytes: Int64 = 0
+
+        try await withThrowingTaskGroup(of: ChunkDownloadResult.self) { group in
+            for (index, range) in ranges.enumerated() {
+                group.addTask {
+                    try await semaphore.acquire()
+                    do {
+                        let result = try await downloadChunk(
+                            from: url,
+                            range: range,
+                            index: index,
+                            tempDir: tempDir,
+                            session: session
+                        )
+                        await semaphore.release()
+                        return result
+                    } catch {
+                        await semaphore.release()
+                        throw error
+                    }
+                }
+            }
+
+            for try await result in group {
+                results.append(result)
+                completedBytes += result.byteCount
+                progress(min(completedBytes, expectedSize))
+            }
+        }
+
+        guard results.count == ranges.count else {
+            throw URLError(.badServerResponse)
+        }
+
+        try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let assembled = tempDir.appendingPathComponent("assembled")
+        fm.createFile(atPath: assembled.path, contents: nil)
+        let output = try FileHandle(forWritingTo: assembled)
+        var didClose = false
+        defer {
+            if !didClose {
+                try? output.close()
+            }
+        }
+
+        for result in results.sorted(by: { $0.index < $1.index }) {
+            let data = try Data(contentsOf: result.fileURL)
+            try output.write(contentsOf: data)
+        }
+
+        try output.close()
+        didClose = true
+        try? fm.removeItem(at: destination)
+        try fm.moveItem(at: assembled, to: destination)
+    }
+}
+
+private struct ByteRange: Sendable {
+    let start: Int64
+    let end: Int64
+
+    var byteCount: Int64 {
+        end - start + 1
+    }
+
+    var headerValue: String {
+        "bytes=\(start)-\(end)"
+    }
+}
+
+private struct ChunkDownloadResult: Sendable {
+    let index: Int
+    let byteCount: Int64
+    let fileURL: URL
+}
+
+private struct RangeDownloadUnsupported: Error {}
+
+private func byteRanges(totalSize: Int64, chunkSize: Int64) -> [ByteRange] {
+    stride(from: Int64(0), to: totalSize, by: Int(chunkSize)).map { start in
+        ByteRange(start: start, end: min(start + chunkSize - 1, totalSize - 1))
+    }
+}
+
+private func downloadChunk(
+    from url: URL,
+    range: ByteRange,
+    index: Int,
+    tempDir: URL,
+    session: URLSession
+) async throws -> ChunkDownloadResult {
+    var request = URLRequest(url: url)
+    request.setValue(range.headerValue, forHTTPHeaderField: "Range")
+
+    let (data, response) = try await session.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw URLError(.badServerResponse)
+    }
+
+    guard http.statusCode == 206 else {
+        if (200..<300).contains(http.statusCode) {
+            throw RangeDownloadUnsupported()
+        }
+        throw URLError(.badServerResponse)
+    }
+
+    guard Int64(data.count) == range.byteCount else {
+        throw URLError(.badServerResponse)
+    }
+
+    let fileURL = tempDir.appendingPathComponent(String(format: "%06d.chunk", index))
+    try data.write(to: fileURL, options: .atomic)
+    return ChunkDownloadResult(index: index, byteCount: Int64(data.count), fileURL: fileURL)
 }
 
 // MARK: - DownloadProgressAggregator
