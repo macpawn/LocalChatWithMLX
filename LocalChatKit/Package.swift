@@ -32,5 +32,9 @@ let package = Package(
             name: "LocalChatKitTests",
             dependencies: ["LocalChatKit", "LocalChatKitMocks"]
         ),
+        .testTarget(
+            name: "LocalChatKitAPITests",
+            dependencies: ["LocalChatKit"]
+        ),
     ]
 )

@@ -343,6 +343,7 @@ struct ModelRowView: View {
         case .gemma4_e4b:  return LC.green
         case .llama3_2_1B: return LC.blue
         case .llama3_2_3B: return LC.amber
+        case .smolLM135M: return LC.red
         }
     }
 

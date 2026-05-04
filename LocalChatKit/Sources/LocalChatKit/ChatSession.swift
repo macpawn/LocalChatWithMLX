@@ -14,15 +14,7 @@ public actor ChatSession: ChatSessionProtocol {
 
     // MARK: - ChatSessionProtocol
 
-    /// Streams tokens one by one. The final event is `.completed(GenerationStats)`.
-    /// Cancels the underlying generation task when the caller abandons the stream.
-    /// Note: cancellation leaves `history` unmodified (partial exchange is not recorded).
-    /// Call `clearHistory()` after a cancelled turn if you want to reset the session state.
-    ///
-    /// V1: `options` is accepted for API compatibility but not yet forwarded to
-    /// MLXLMCommon (which does not expose per-call generation parameters).
-    public func sendStreaming(_ message: String, options: GenerationOptions = .default) -> AsyncThrowingStream<ChatEvent, Error> {
-        _ = options
+    public func sendStreaming(_ message: String) -> AsyncThrowingStream<ChatEvent, Error> {
         return AsyncThrowingStream(ChatEvent.self) { continuation in
             let task = Task {
                 var fullResponse = ""
@@ -75,11 +67,11 @@ public actor ChatSession: ChatSessionProtocol {
     }
 
     /// Sends a message and returns the complete response.
-    public func send(_ message: String, options: GenerationOptions = .default) async throws -> ChatResponse {
+    public func send(_ message: String) async throws -> ChatResponse {
         var fullText = ""
         var stats: GenerationStats? = nil
 
-        for try await event in sendStreaming(message, options: options) {
+        for try await event in sendStreaming(message) {
             switch event {
             case .token(let text):   fullText += text
             case .completed(let s): stats = s

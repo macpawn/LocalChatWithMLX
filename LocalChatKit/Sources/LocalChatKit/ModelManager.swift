@@ -60,9 +60,14 @@ public actor ModelManager: ModelManagerProtocol {
                         useLatest: false,
                         progressHandler: { progress in
                             let now = Date()
-                            let completed = progress.completedUnitCount
+                            print("\(progress.totalUnitCount), \(progress.completedUnitCount), \(progress.fractionCompleted), \(progress.fileCompletedCount)")
+                            // fractionCompleted aggregates child Progress objects correctly;
+                            // completedUnitCount on the parent is never updated by Foundation's
+                            // child composition and always returns 0.
                             let total = progress.totalUnitCount
-                            let percent = total > 0 ? Int(Double(completed) / Double(total) * 100) : 0
+                            let completed = progress.completedUnitCount
+                            let fraction = Double(completed) / Double(total)
+                            let percent = Int(fraction * 100)
 
                             let elapsed = now.timeIntervalSince(state.lastDate)
                             let bytesPerSecond: Double

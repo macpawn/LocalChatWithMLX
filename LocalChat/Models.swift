@@ -64,28 +64,11 @@ struct Conversation: Identifiable, Equatable {
 // MARK: - Model Metadata
 
 extension LocalChatKit.Model {
-    var displayName: String {
-        switch self {
-        case .gemma4_e2b:  return "Gemma 4 E2B"
-        case .gemma4_e4b:  return "Gemma 4 E4B"
-        case .llama3_2_1B: return "Llama 3.2 1B"
-        case .llama3_2_3B: return "Llama 3.2 3B"
-        }
-    }
-
     var quantLabel: String { "4bit" }
-
-    var sizeLabel: String {
-        switch self {
-        case .gemma4_e2b:  return "~2 GB"
-        case .gemma4_e4b:  return "~4 GB"
-        case .llama3_2_1B: return "~0.7 GB"
-        case .llama3_2_3B: return "~2 GB"
-        }
-    }
 
     var paramsLabel: String {
         switch self {
+        case .smolLM135M:  return "135M"
         case .gemma4_e2b:  return "2B"
         case .gemma4_e4b:  return "4B"
         case .llama3_2_1B: return "1B"
@@ -95,6 +78,7 @@ extension LocalChatKit.Model {
 
     var accentColor: AppColor {
         switch self {
+        case .smolLM135M:  return AppColor(r: 0.000, g: 0.749, b: 0.820) // teal
         case .gemma4_e2b:  return AppColor(r: 0.400, g: 0.361, b: 0.804) // purple
         case .gemma4_e4b:  return AppColor(r: 0.188, g: 0.820, b: 0.345) // green
         case .llama3_2_1B: return AppColor(r: 0.039, g: 0.518, b: 1.000) // blue

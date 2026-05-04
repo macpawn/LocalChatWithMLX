@@ -20,7 +20,7 @@ struct MockChatSessionTests {
         let stats = makeStats()
         await session.stub(events: [.token("Hello"), .token(" world"), .completed(stats)])
 
-        let response = try await session.send("Hi", options: .default)
+        let response = try await session.send("Hi")
 
         #expect(response.text == "Hello world")
         #expect(response.stats == stats)
@@ -31,8 +31,8 @@ struct MockChatSessionTests {
         let stats = makeStats()
         await session.stub(events: [.token("ok"), .completed(stats)])
 
-        _ = try await session.send("msg1", options: .default)
-        _ = try await session.send("msg2", options: .default)
+        _ = try await session.send("msg1")
+        _ = try await session.send("msg2")
 
         let count = await session.sendCallCount
         #expect(count == 2)
@@ -43,7 +43,7 @@ struct MockChatSessionTests {
         let stats = makeStats()
         await session.stub(events: [.token("ok"), .completed(stats)])
 
-        _ = try await session.send("hello there", options: .default)
+        _ = try await session.send("hello there")
 
         let last = await session.lastMessage
         #expect(last == "hello there")
@@ -56,7 +56,7 @@ struct MockChatSessionTests {
         ))
 
         await #expect(throws: (any Error).self) {
-            _ = try await session.send("hi", options: .default)
+            _ = try await session.send("hi")
         }
     }
 
@@ -64,7 +64,7 @@ struct MockChatSessionTests {
         let session = MockChatSession()
         let stats = makeStats()
         await session.stub(events: [.token("reply"), .completed(stats)])
-        _ = try await session.send("msg", options: .default)
+        _ = try await session.send("msg")
 
         let historyBeforeClear = await session.history
         #expect(historyBeforeClear.count == 2)  // user + assistant
@@ -82,7 +82,7 @@ struct MockChatSessionTests {
 
         var tokens: [String] = []
         var finalStats: GenerationStats? = nil
-        for try await event in await session.sendStreaming("q", options: .default) {
+        for try await event in await session.sendStreaming("q") {
             switch event {
             case .token(let t): tokens.append(t)
             case .completed(let s): finalStats = s

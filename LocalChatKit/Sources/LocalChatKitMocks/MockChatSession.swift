@@ -24,7 +24,7 @@ public actor MockChatSession: ChatSessionProtocol {
 
     // MARK: - ChatSessionProtocol
 
-    public func sendStreaming(_ message: String, options: GenerationOptions) -> AsyncThrowingStream<ChatEvent, Error> {
+    public func sendStreaming(_ message: String) -> AsyncThrowingStream<ChatEvent, Error> {
         sendCallCount += 1
         lastMessage = message
         let events = stubbedEvents
@@ -43,10 +43,10 @@ public actor MockChatSession: ChatSessionProtocol {
         }
     }
 
-    public func send(_ message: String, options: GenerationOptions) async throws -> ChatResponse {
+    public func send(_ message: String) async throws -> ChatResponse {
         var text = ""
         var stats: GenerationStats? = nil
-        for try await event in sendStreaming(message, options: options) {
+        for try await event in sendStreaming(message) {
             switch event {
             case .token(let t): text += t
             case .completed(let s): stats = s

@@ -5,6 +5,7 @@ import Testing
 struct ModelTests {
 
     @Test func huggingFaceIDsAreCorrect() {
+        #expect(Model.smolLM135M.huggingFaceID == "mlx-community/SmolLM-135M-Instruct-4bit")
         #expect(Model.gemma4_e4b.huggingFaceID == "mlx-community/gemma-4-e4b-it-4bit")
         #expect(Model.gemma4_e2b.huggingFaceID == "mlx-community/gemma-4-e2b-it-4bit")
         #expect(Model.llama3_2_1B.huggingFaceID == "mlx-community/Llama-3.2-1B-Instruct-4bit")
@@ -12,7 +13,7 @@ struct ModelTests {
     }
 
     @Test func allCasesCoversAllModels() {
-        #expect(Model.allCases.count == 4)
+        #expect(Model.allCases.count == 5)
     }
 
     @Test func defaultStorageConfigHasValidPath() {
