@@ -344,6 +344,8 @@ struct MetricsFooterView: View {
 struct ModelLoadingOverlayView: View {
     let modelName: String
     let progress: Double?   // nil = indeterminate
+    let speedMBps: Double
+    let totalBytes: Int64
     let stage: String
     let cancel: () -> Void
 
@@ -417,10 +419,15 @@ struct ModelLoadingOverlayView: View {
                             .font(.system(size: 10.5, design: .monospaced))
                             .foregroundColor(LC.textSecondary)
                         Spacer()
-//                        let remaining = (1.0 - p) * 6.0
-//                        Text(String(format: "%.1fs remaining", remaining))
-//                            .font(.system(size: 10.5, design: .monospaced))
-//                            .foregroundColor(LC.textSecondary)
+                        let remainingBytes = Double(totalBytes) * (1.0 - p)
+                        let remainingText: String = speedMBps > 0
+                            ? String(format: "%.0fs remaining", remainingBytes / (speedMBps * 1_048_576))
+                            : ""
+                        if !remainingText.isEmpty {
+                            Text(remainingText)
+                                .font(.system(size: 10.5, design: .monospaced))
+                                .foregroundColor(LC.textSecondary)
+                        }
                     } else {
                         Spacer()
                     }

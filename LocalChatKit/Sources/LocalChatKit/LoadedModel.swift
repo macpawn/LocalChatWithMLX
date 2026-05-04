@@ -1,6 +1,7 @@
 import Foundation
 import MLXLMCommon
 
+// @unchecked: ModelContainer from MLX does not yet conform to Sendable; all properties are write-once at init.
 public final class LoadedModel: @unchecked Sendable {
     public let model: Model
     public let modelID: String

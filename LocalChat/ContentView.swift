@@ -39,10 +39,12 @@ struct ContentView: View {
     @ViewBuilder
     private var modelOverlay: some View {
         switch vm.modelStatus {
-        case .downloading(let progress, let speed):
+        case .downloading(let progress, let speed, let totalBytes):
             ModelLoadingOverlayView(
                 modelName: vm.selectedModel.displayName,
                 progress: progress,
+                speedMBps: speed,
+                totalBytes: totalBytes,
                 stage: String(format: "Downloading · %.1f MB/s", speed),
                 cancel: { vm.cancelSelectedModelLoad() }
             )
@@ -50,6 +52,8 @@ struct ContentView: View {
             ModelLoadingOverlayView(
                 modelName: vm.selectedModel.displayName,
                 progress: nil,
+                speedMBps: 0,
+                totalBytes: 0,
                 stage: "Loading into memory…",
                 cancel: { vm.cancelSelectedModelLoad() }
             )

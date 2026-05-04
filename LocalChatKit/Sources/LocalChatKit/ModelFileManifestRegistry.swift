@@ -29,6 +29,7 @@ public protocol ModelFileManifestStore: Sendable {
     func removeManifest(for model: Model) throws
 }
 
+// @unchecked: UserDefaults is documented as thread-safe; no mutable state beyond it.
 public final class UserDefaultsModelFileManifestStore: ModelFileManifestStore, @unchecked Sendable {
     private let defaults: UserDefaults
     private let keyPrefix: String
@@ -60,6 +61,7 @@ public final class UserDefaultsModelFileManifestStore: ModelFileManifestStore, @
     }
 }
 
+// @unchecked: store conforms to Sendable; FileManager.default is thread-safe; no mutable instance state.
 public final class ModelFileManifestRegistry: @unchecked Sendable {
     private let store: any ModelFileManifestStore
     private let fileManager: FileManager

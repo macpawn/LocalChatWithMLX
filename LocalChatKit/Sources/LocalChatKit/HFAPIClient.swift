@@ -21,6 +21,7 @@ struct HFRepoMeta {
 
 enum HFError: Error {
     case badResponse
+    case invalidURL
 }
 
 protocol HFRepoMetadataProviding: Sendable {
@@ -50,7 +51,11 @@ func fetchHFRepoMeta(
     allowedExtensions: Set<String> = ["safetensors", "json", "jinja"],
     maxConcurrentRequests: Int = 5
 ) async throws -> HFRepoMeta {
-    let apiURL = URL(string: "https://huggingface.co/api/models/\(modelID)")!
+    var components = URLComponents()
+    components.scheme = "https"
+    components.host = "huggingface.co"
+    components.path = "/api/models/\(modelID)"
+    guard let apiURL = components.url else { throw HFError.invalidURL }
     let (data, _) = try await URLSession.shared.data(from: apiURL)
     let model = try JSONDecoder().decode(HFModelResponse.self, from: data)
 
@@ -65,14 +70,16 @@ func fetchHFRepoMeta(
         for file in filteredFiles {
             group.addTask {
                 await semaphore.acquire()
-                defer { Task { await semaphore.release() } }
                 do {
-                    return try await fetchSingleFileMeta(
+                    let result = try await fetchSingleFileMeta(
                         modelID: modelID,
                         revision: model.sha,
                         filename: file.rfilename
                     )
+                    await semaphore.release()
+                    return result
                 } catch {
+                    await semaphore.release()
                     return nil
                 }
             }
@@ -94,7 +101,11 @@ private func fetchSingleFileMeta(
     revision: String,
     filename: String
 ) async throws -> HFFileMeta {
-    let url = URL(string: "https://huggingface.co/\(modelID)/resolve/\(revision)/\(filename)")!
+    var components = URLComponents()
+    components.scheme = "https"
+    components.host = "huggingface.co"
+    components.path = "/\(modelID)/resolve/\(revision)/\(filename)"
+    guard let url = components.url else { throw HFError.invalidURL }
     var request = URLRequest(url: url)
     request.httpMethod = "HEAD"
 
@@ -108,7 +119,9 @@ private func fetchSingleFileMeta(
     }()
 
     let sha256: String = {
-        guard let etag = http.value(forHTTPHeaderField: "ETag") else { return "" }
+        // X-Linked-Etag contains the actual SHA-256 for LFS files.
+        // Regular ETag is an opaque revision string for non-LFS files and must not be used for integrity checks.
+        guard let etag = http.value(forHTTPHeaderField: "X-Linked-Etag") else { return "" }
         return etag
             .replacingOccurrences(of: "W/", with: "")
             .replacingOccurrences(of: "\"", with: "")

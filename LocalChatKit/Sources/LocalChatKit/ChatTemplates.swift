@@ -4,25 +4,6 @@ public protocol ChatTemplate: Sendable {
     func render(messages: [ChatMessage]) -> String
 }
 
-public struct GemmaChatTemplate: ChatTemplate {
-    public init() {}
-
-    public func render(messages: [ChatMessage]) -> String {
-        messages
-            .map { message in
-                let role = switch message.role {
-                case .system: "user"
-                case .user: "user"
-                case .assistant: "model"
-                }
-
-                return "<start_of_turn>\(role)\n\(message.content)<end_of_turn>"
-            }
-            .joined(separator: "\n")
-            + "\n<start_of_turn>model\n"
-    }
-}
-
 public struct Gemma4ChatTemplate: ChatTemplate {
     public init() {}
 

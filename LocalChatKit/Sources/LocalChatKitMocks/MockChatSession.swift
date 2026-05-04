@@ -43,6 +43,10 @@ public actor MockChatSession: ChatSessionProtocol {
         }
     }
 
+    public func sendStreaming(_ message: String, sampling _: SamplingConfig) -> AsyncThrowingStream<ChatEvent, Error> {
+        sendStreaming(message)
+    }
+
     public func send(_ message: String) async throws -> ChatResponse {
         var text = ""
         var stats: GenerationStats? = nil

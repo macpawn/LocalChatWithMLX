@@ -2,26 +2,6 @@ import Testing
 @testable import LocalChatKit
 
 struct ChatTemplatesTests {
-    @Test func rendersGemmaTurns() {
-        let template = GemmaChatTemplate()
-        let prompt = template.render(messages: [
-            ChatMessage(role: .system, content: "Be brief."),
-            ChatMessage(role: .user, content: "Hello"),
-            ChatMessage(role: .assistant, content: "Hi"),
-        ])
-
-        #expect(prompt == """
-        <start_of_turn>user
-        Be brief.<end_of_turn>
-        <start_of_turn>user
-        Hello<end_of_turn>
-        <start_of_turn>model
-        Hi<end_of_turn>
-        <start_of_turn>model
-
-        """)
-    }
-
     @Test func rendersSmolLMChatMLTurns() {
         let template = SmolLMChatTemplate()
         let prompt = template.render(messages: [

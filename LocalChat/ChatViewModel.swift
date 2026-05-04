@@ -18,6 +18,8 @@ final class ChatViewModel {
     }
 
     // MARK: - Conversations
+    // NOTE: All conversation and message data is stored in memory only.
+    // Quitting the app discards all history. Persistence is not yet implemented.
 
     var conversations: [Conversation] = []
     var selectedConversationId: UUID?
@@ -42,7 +44,7 @@ final class ChatViewModel {
     private let downloader = HubDownloadManager()
     private var loadedModelStore: [LocalChatKit.Model: LoadedModel] = [:]
     private var modelStatusStore: [LocalChatKit.Model: ModelStatus] = [:]
-    private var sessionStore: [UUID: ChatSession] = [:]
+    private var sessionStore: [UUID: any ChatSessionProtocol] = [:]
     private var modelLoadTasks: [LocalChatKit.Model: Task<Void, Never>] = [:]
     private var generationTask: Task<Void, Never>?
     private var messageStore: [UUID: [ChatMessage]] = [:]
@@ -67,7 +69,8 @@ final class ChatViewModel {
                         guard !Task.isCancelled else { return }
                         modelStatusStore[modelToLoad] = .downloading(
                             progress: Double(progress.percent) / 100.0,
-                            speedMBps: progress.bytesPerSecond / 1_048_576
+                            speedMBps: progress.bytesPerSecond / 1_048_576,
+                            totalBytes: progress.totalBytes
                         )
                     }
                 }
@@ -149,8 +152,10 @@ final class ChatViewModel {
                     guard !Task.isCancelled else { break }
                     switch event {
                     case .token(let token):
-                        guard let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) else { continue }
-                        messageStore[convId]![idx].content += token
+                        guard var msgs = messageStore[convId],
+                              let idx = msgs.firstIndex(where: { $0.id == assistantId }) else { continue }
+                        msgs[idx].content += token
+                        messageStore[convId] = msgs
                         if selectedConversationId == convId,
                            let visibleIdx = messages.firstIndex(where: { $0.id == assistantId }) {
                             messages[visibleIdx].content += token
@@ -162,9 +167,11 @@ final class ChatViewModel {
                             promptTokens: stats.promptTokenCount,
                             responseTokens: stats.generatedTokenCount
                         )
-                        if let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) {
-                            messageStore[convId]![idx].isStreaming = false
-                            messageStore[convId]![idx].metrics = metrics
+                        if var msgs = messageStore[convId],
+                           let idx = msgs.firstIndex(where: { $0.id == assistantId }) {
+                            msgs[idx].isStreaming = false
+                            msgs[idx].metrics = metrics
+                            messageStore[convId] = msgs
                         }
                         if selectedConversationId == convId,
                            let visibleIdx = messages.firstIndex(where: { $0.id == assistantId }) {
@@ -176,8 +183,10 @@ final class ChatViewModel {
                     }
                 }
             } catch {
-                if let idx = messageStore[convId]?.firstIndex(where: { $0.id == assistantId }) {
-                    messageStore[convId]![idx].isStreaming = false
+                if var msgs = messageStore[convId],
+                   let idx = msgs.firstIndex(where: { $0.id == assistantId }) {
+                    msgs[idx].isStreaming = false
+                    messageStore[convId] = msgs
                 }
                 if selectedConversationId == convId,
                    let visibleIdx = messages.lastIndex(where: { $0.isStreaming }) {
@@ -192,8 +201,10 @@ final class ChatViewModel {
         generationTask?.cancel()
         generationTask = nil
         if let convId = selectedConversationId,
-           let idx = messageStore[convId]?.lastIndex(where: { $0.isStreaming }) {
-            messageStore[convId]![idx].isStreaming = false
+           var msgs = messageStore[convId],
+           let idx = msgs.lastIndex(where: { $0.isStreaming }) {
+            msgs[idx].isStreaming = false
+            messageStore[convId] = msgs
         }
         if let idx = messages.lastIndex(where: { $0.isStreaming }) {
             messages[idx].isStreaming = false
@@ -271,7 +282,7 @@ final class ChatViewModel {
         )
     }
 
-    private func sessionForSelectedConversation() -> ChatSession? {
+    private func sessionForSelectedConversation() -> (any ChatSessionProtocol)? {
         createSessionForSelectedConversationIfNeeded()
         guard let selectedConversationId else { return nil }
         return sessionStore[selectedConversationId]
@@ -354,7 +365,7 @@ extension ChatViewModel {
     }
 
     func markModelDownloadingForTesting(_ model: LocalChatKit.Model) {
-        modelStatusStore[model] = .downloading(progress: 0.25, speedMBps: 1.0)
+        modelStatusStore[model] = .downloading(progress: 0.25, speedMBps: 1.0, totalBytes: 0)
     }
 }
 #endif

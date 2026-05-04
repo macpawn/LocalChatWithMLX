@@ -76,14 +76,43 @@ public actor HubDownloadManager: HubDownloaderProtocol {
                         for file in meta.files {
                             group.addTask {
                                 await semaphore.acquire()
-                                defer { Task { await semaphore.release() } }
+                                do {
+                                    let blobKey = file.sha256.isEmpty ? file.relativePath : file.sha256
+                                    let blobPath = dirs.blobs.appendingPathComponent(blobKey)
+                                    let linkPath = dirs.snapshot.appendingPathComponent(file.relativePath)
 
-                                let blobKey = file.sha256.isEmpty ? file.relativePath : file.sha256
-                                let blobPath = dirs.blobs.appendingPathComponent(blobKey)
-                                let linkPath = dirs.snapshot.appendingPathComponent(file.relativePath)
+                                    if FileManager.default.fileExists(atPath: blobPath.path) {
+                                        let (current, speed) = await progress.addCached(file.size)
+                                        continuation.yield(DownloadProgress(
+                                            percent: hfPct(current, of: totalBytes),
+                                            bytesDownloaded: current,
+                                            totalBytes: totalBytes,
+                                            bytesPerSecond: speed
+                                        ))
+                                        try HFCacheDirs.ensureSymlink(at: linkPath, blobKey: blobKey, relativePath: file.relativePath)
+                                        await semaphore.release()
+                                        return
+                                    }
 
-                                if FileManager.default.fileExists(atPath: blobPath.path) {
-                                    let (current, speed) = await progress.addCached(file.size)
+                                    var components = URLComponents()
+                                    components.scheme = "https"
+                                    components.host = "huggingface.co"
+                                    components.path = "/\(model.huggingFaceID)/resolve/\(meta.commitHash)/\(file.relativePath)"
+                                    guard let remoteURL = components.url else {
+                                        throw HFError.invalidURL
+                                    }
+
+                                    for try await written in self.streamDownload(from: remoteURL, to: blobPath) {
+                                        let (current, speed) = await progress.update(file: file.relativePath, written: written)
+                                        continuation.yield(DownloadProgress(
+                                            percent: hfPct(current, of: totalBytes),
+                                            bytesDownloaded: current,
+                                            totalBytes: totalBytes,
+                                            bytesPerSecond: speed
+                                        ))
+                                    }
+
+                                    let (current, speed) = await progress.finish(file: file.relativePath, finalSize: file.size)
                                     continuation.yield(DownloadProgress(
                                         percent: hfPct(current, of: totalBytes),
                                         bytesDownloaded: current,
@@ -91,31 +120,11 @@ public actor HubDownloadManager: HubDownloaderProtocol {
                                         bytesPerSecond: speed
                                     ))
                                     try HFCacheDirs.ensureSymlink(at: linkPath, blobKey: blobKey, relativePath: file.relativePath)
-                                    return
+                                    await semaphore.release()
+                                } catch {
+                                    await semaphore.release()
+                                    throw error
                                 }
-
-                                let remoteURL = URL(string:
-                                    "https://huggingface.co/\(model.huggingFaceID)/resolve/\(meta.commitHash)/\(file.relativePath)"
-                                )!
-
-                                for try await written in self.streamDownload(from: remoteURL, to: blobPath) {
-                                    let (current, speed) = await progress.update(file: file.relativePath, written: written)
-                                    continuation.yield(DownloadProgress(
-                                        percent: hfPct(current, of: totalBytes),
-                                        bytesDownloaded: current,
-                                        totalBytes: totalBytes,
-                                        bytesPerSecond: speed
-                                    ))
-                                }
-
-                                let (current, speed) = await progress.finish(file: file.relativePath, finalSize: file.size)
-                                continuation.yield(DownloadProgress(
-                                    percent: hfPct(current, of: totalBytes),
-                                    bytesDownloaded: current,
-                                    totalBytes: totalBytes,
-                                    bytesPerSecond: speed
-                                ))
-                                try HFCacheDirs.ensureSymlink(at: linkPath, blobKey: blobKey, relativePath: file.relativePath)
                             }
                         }
                         try await group.waitForAll()

@@ -9,7 +9,7 @@ public struct MLXChatGenerator: ChatGenerating {
     }
 
     public func generate(
-        prompt: String,
+        prompt _: String,
         messages: [ChatMessage],
         sampling: SamplingConfig
     ) -> AsyncThrowingStream<ChatGenerationEvent, Error> {
@@ -48,7 +48,6 @@ public struct MLXChatGenerator: ChatGenerating {
                         }
                     }
 
-                    _ = prompt
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)

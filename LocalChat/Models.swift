@@ -5,7 +5,7 @@ import LocalChatKit
 
 enum ModelStatus: Equatable {
     case unloaded
-    case downloading(progress: Double, speedMBps: Double)
+    case downloading(progress: Double, speedMBps: Double, totalBytes: Int64)
     case loading
     case ready
     case error(String)
